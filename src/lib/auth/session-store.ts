@@ -18,19 +18,17 @@ export function useUserSession() {
   // If path starts with /superadmin, default to superadmin
   const isSuperadminPath = pathname?.startsWith("/superadmin");
 
-  const [role, setRole] = useState<UserRole>(() => {
+  // SSR deterministic initial state to eliminate hydration mismatches
+  const [role, setRole] = useState<UserRole>(isSuperadminPath ? "superadmin" : "admin");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(SESSION_STORAGE_KEY) as UserRole;
       if (saved && ["cajero", "supervisor", "admin", "superadmin"].includes(saved)) {
-        return isSuperadminPath ? "superadmin" : saved;
+        setRole(isSuperadminPath ? "superadmin" : saved);
       }
-    }
-    return isSuperadminPath ? "superadmin" : "admin";
-  });
-
-  useEffect(() => {
-    if (isSuperadminPath && role !== "superadmin") {
-      setRole("superadmin");
     }
   }, [isSuperadminPath]);
 
@@ -56,5 +54,6 @@ export function useUserSession() {
     user: activeUser,
     navigationGroups,
     switchRole,
+    isMounted,
   };
 }

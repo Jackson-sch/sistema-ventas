@@ -60,7 +60,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </div>
                   <div className="flex flex-col gap-0.5 leading-none overflow-hidden">
                     <span className="text-sm font-bold text-white tracking-tight truncate">NovaMarket POS</span>
-                    <span className="text-[11px] text-blue-400 font-medium flex items-center gap-1 truncate">
+                    <span
+                      suppressHydrationWarning
+                      className="text-[11px] text-blue-400 font-medium flex items-center gap-1 truncate"
+                    >
                       <Building2 className="size-3 shrink-0" /> {user.sucursal || "Sucursal Central"}
                     </span>
                   </div>

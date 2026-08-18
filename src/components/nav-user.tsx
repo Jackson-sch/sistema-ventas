@@ -91,11 +91,11 @@ export function NavUser({ user, onSwitchRole }: NavUserProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-xs leading-tight">
-                <span className="truncate font-bold text-white flex items-center gap-1.5">
+                <span suppressHydrationWarning className="truncate font-bold text-white flex items-center gap-1.5">
                   {user.name}
                   {isSuperadmin && <Crown className="size-3 text-amber-400 shrink-0" />}
                 </span>
-                <span className={`truncate text-[11px] font-semibold ${getRoleBadgeColor()}`}>
+                <span suppressHydrationWarning className={`truncate text-[11px] font-semibold ${getRoleBadgeColor()}`}>
                   {user.roleTitle}
                 </span>
               </div>
@@ -114,13 +114,13 @@ export function NavUser({ user, onSwitchRole }: NavUserProps) {
                   {user.initials}
                 </div>
                 <div className="grid flex-1 text-left text-xs leading-tight">
-                  <span className="truncate font-bold text-white">
+                  <span suppressHydrationWarning className="truncate font-bold text-white">
                     {user.name}
                   </span>
-                  <span className="truncate text-[10px] text-slate-400 font-mono">
+                  <span suppressHydrationWarning className="truncate text-[10px] text-slate-400 font-mono">
                     {user.email}
                   </span>
-                  <span className="text-[10px] text-slate-500 font-semibold truncate">
+                  <span suppressHydrationWarning className="text-[10px] text-slate-500 font-semibold truncate">
                     {user.sucursal}
                   </span>
                 </div>

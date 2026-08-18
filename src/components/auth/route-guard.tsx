@@ -22,7 +22,11 @@ interface RouteGuardProps {
 export function RouteGuard({ children }: RouteGuardProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, user, switchRole } = useUserSession();
+  const { role, user, switchRole, isMounted } = useUserSession();
+
+  if (!isMounted) {
+    return <>{children}</>;
+  }
 
   const isAllowed = canRoleAccessRoute(role, pathname);
 
