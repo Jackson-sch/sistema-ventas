@@ -423,3 +423,113 @@ export function getNavigationForRole(role: UserRole): NavGroup[] {
       return cashierNavigationGroups;
   }
 }
+
+const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
+  cajero: [
+    "/pos",
+    "/pos/display",
+    "/ventas",
+    "/clientes",
+    "/consultas",
+    "/login",
+  ],
+  supervisor: [
+    "/pos",
+    "/pos/display",
+    "/ventas",
+    "/ventas/cotizaciones",
+    "/ventas/resumenes",
+    "/clientes",
+    "/inventario",
+    "/inventario/promociones",
+    "/inventario/conteo",
+    "/inventario/etiquetas",
+    "/dashboard",
+    "/reportes",
+    "/consultas",
+    "/login",
+  ],
+  admin: [
+    "/pos",
+    "/pos/display",
+    "/ventas",
+    "/ventas/cotizaciones",
+    "/ventas/resumenes",
+    "/clientes",
+    "/inventario",
+    "/inventario/promociones",
+    "/inventario/transferencias",
+    "/inventario/kardex",
+    "/inventario/conteo",
+    "/inventario/etiquetas",
+    "/compras",
+    "/dashboard",
+    "/reportes",
+    "/reportes/sire",
+    "/auditoria",
+    "/dev/venta-test",
+    "/sucursales",
+    "/usuarios",
+    "/configuracion",
+    "/consultas",
+    "/login",
+  ],
+  superadmin: ["*"],
+};
+
+export function canRoleAccessRoute(role: UserRole, pathname: string): boolean {
+  if (role === "superadmin") return true;
+  if (!pathname || pathname === "/") return true;
+
+  const cleanPath = pathname.split("?")[0].replace(/\/$/, "") || "/";
+
+  // For cashier, strictly forbid admin/supervisor sub-routes
+  if (role === "cajero") {
+    if (
+      cleanPath.startsWith("/ventas/resumenes") ||
+      cleanPath.startsWith("/ventas/cotizaciones") ||
+      cleanPath.startsWith("/inventario") ||
+      cleanPath.startsWith("/compras") ||
+      cleanPath.startsWith("/reportes") ||
+      cleanPath.startsWith("/dashboard") ||
+      cleanPath.startsWith("/usuarios") ||
+      cleanPath.startsWith("/sucursales") ||
+      cleanPath.startsWith("/configuracion") ||
+      cleanPath.startsWith("/auditoria") ||
+      cleanPath.startsWith("/superadmin")
+    ) {
+      return false;
+    }
+    return (
+      cleanPath === "/pos" ||
+      cleanPath.startsWith("/pos/") ||
+      cleanPath === "/ventas" ||
+      cleanPath === "/clientes" ||
+      cleanPath === "/consultas"
+    );
+  }
+
+  if (role === "supervisor") {
+    if (
+      cleanPath.startsWith("/compras") ||
+      cleanPath.startsWith("/inventario/transferencias") ||
+      cleanPath.startsWith("/inventario/kardex") ||
+      cleanPath.startsWith("/reportes/sire") ||
+      cleanPath.startsWith("/usuarios") ||
+      cleanPath.startsWith("/sucursales") ||
+      cleanPath.startsWith("/configuracion") ||
+      cleanPath.startsWith("/auditoria") ||
+      cleanPath.startsWith("/superadmin")
+    ) {
+      return false;
+    }
+  }
+
+  if (role === "admin") {
+    if (cleanPath.startsWith("/superadmin")) {
+      return false;
+    }
+  }
+
+  return true;
+}

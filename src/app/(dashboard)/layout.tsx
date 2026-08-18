@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { RouteGuard } from "@/components/auth/route-guard";
 
 export default function DashboardLayout({
   children,
@@ -21,7 +22,7 @@ export default function DashboardLayout({
               </div>
             }
           >
-            {children}
+            <RouteGuard>{children}</RouteGuard>
           </Suspense>
         </div>
       </SidebarInset>
