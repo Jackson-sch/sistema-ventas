@@ -61,6 +61,11 @@ import {
   closeShiftAction,
 } from "@/actions/cash-actions";
 import { getProductsData, getClientsData } from "@/actions/data-fetchers";
+import {
+  getQuotationByIdAction,
+  markQuotationAsConvertedAction,
+} from "@/actions/quotation-actions";
+import { useQueryState, parseAsString } from "nuqs";
 
 interface CartItem {
   id: string;
@@ -197,6 +202,36 @@ export default function PosPage() {
   // Held Carts / Parking de Ventas State
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
   const [isHoldCartsOpen, setIsHoldCartsOpen] = useState(false);
+
+  // Quotation / Proforma Loading State
+  const [cotizacionParam, setCotizacionParam] = useQueryState("cotizacion", parseAsString.withDefault(""));
+  const [loadedQuotationId, setLoadedQuotationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cotizacionParam) return;
+    getQuotationByIdAction(cotizacionParam).then((q) => {
+      if (q && q.estado === "vigente") {
+        setCart(
+          q.items.map((i) => ({
+            id: i.productoId,
+            sku: i.sku,
+            nombre: i.nombre,
+            categoria: "General",
+            precio: i.precioUnit,
+            cantidad: i.cantidad,
+            tipo: i.tipo,
+          }))
+        );
+        setDocType(q.clienteTipoDoc === "RUC" ? "factura" : "boleta");
+        setCustomerDoc(q.clienteDoc);
+        setCustomerName(q.clienteNombre);
+        setLoadedQuotationId(q.id);
+        toast.success(`Cotización ${q.codigo} precargada en caja`, {
+          description: `Cliente: ${q.clienteNombre} (${q.clienteTipoDoc}: ${q.clienteDoc})`,
+        });
+      }
+    });
+  }, [cotizacionParam]);
 
   // Dynamic Promotion Engine & Loyalty Points Evaluation (0ms Local Calculation)
   const promoCalculation = promotionEngine.evaluateCart(
@@ -635,6 +670,13 @@ export default function PosPage() {
           vuelto: change,
           comprobante: res.comprobanteSerieNumero,
         });
+
+        // If this sale originated from a quotation/proforma, mark it as converted
+        if (loadedQuotationId) {
+          markQuotationAsConvertedAction(loadedQuotationId, res.comprobanteSerieNumero);
+          setLoadedQuotationId(null);
+          setCotizacionParam(null);
+        }
 
         setCart([]);
         setCashReceived("");

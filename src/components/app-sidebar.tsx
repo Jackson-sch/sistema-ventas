@@ -136,6 +136,13 @@ const storeNavigationGroups: NavGroup[] = [
         badgeVariant: "default",
       },
       {
+        title: "Cotizaciones & Proformas",
+        url: "/ventas/cotizaciones",
+        icon: FileText,
+        badge: "COT",
+        badgeVariant: "default",
+      },
+      {
         title: "Resúmenes & Bajas (RC/RA)",
         url: "/ventas/resumenes",
         icon: FileSpreadsheet,
