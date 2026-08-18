@@ -29,6 +29,7 @@ import {
   Activity,
   Server,
   ArrowLeftRight,
+  ClipboardCheck,
 } from "lucide-react"
 
 import { NavMain, type NavGroup } from "@/components/nav-main"
@@ -179,6 +180,13 @@ const storeNavigationGroups: NavGroup[] = [
         title: "Kardex Valorado",
         url: "/inventario/kardex",
         icon: Archive,
+      },
+      {
+        title: "Toma de Inventario",
+        url: "/inventario/conteo",
+        icon: ClipboardCheck,
+        badge: "Conteo",
+        badgeVariant: "default",
       },
       {
         title: "Etiquetas & Góndolas",
