@@ -21,6 +21,7 @@ import {
   HelpCircle,
   Building2,
   Lock,
+  Clock,
   ArrowDownRight,
   ArrowUpRight,
   Calculator,
@@ -31,6 +32,8 @@ import {
   ArrowRightLeft,
   Gift,
   Tag,
+  Monitor,
+  PauseCircle,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -44,9 +47,11 @@ import { ThermalTicketDialog, TicketData } from "@/components/ventas/thermal-tic
 import { CashReportDialog, CashShiftReportData } from "@/components/pos/cash-report-dialog";
 import { SplitPaymentDialog } from "@/components/pos/split-payment-dialog";
 import { PrinterSettingsDialog } from "@/components/pos/printer-settings-dialog";
+import { HoldCartsDialog, HeldCart } from "@/components/pos/hold-carts-dialog";
 import { ConnectivityBadge } from "@/components/pos/connectivity-badge";
 import { offlineStorage } from "@/lib/offline/offline-storage";
 import { escposDriver } from "@/lib/hardware/escpos-driver";
+import { customerDisplayChannel } from "@/lib/hardware/customer-display-channel";
 import { promotionEngine } from "@/lib/promotions/promotion-engine";
 import { completeSaleTransactionAction, SplitPaymentInput } from "@/actions/pos-actions";
 import { lookupIdentityAction } from "@/actions/identity-lookup";
@@ -189,6 +194,10 @@ export default function PosPage() {
   const [isPrinterSettingsOpen, setIsPrinterSettingsOpen] = useState(false);
   const [isPointsRedeemActive, setIsPointsRedeemActive] = useState(false);
 
+  // Held Carts / Parking de Ventas State
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
+  const [isHoldCartsOpen, setIsHoldCartsOpen] = useState(false);
+
   // Dynamic Promotion Engine & Loyalty Points Evaluation (0ms Local Calculation)
   const promoCalculation = promotionEngine.evaluateCart(
     cart,
@@ -201,6 +210,91 @@ export default function PosPage() {
   const total = promoCalculation.totalNeto;
   const subtotal = +(total / 1.18).toFixed(2);
   const igv = +(total - subtotal).toFixed(2);
+
+  // Sync to Customer Facing Display in Real Time via BroadcastChannel
+  useEffect(() => {
+    if (cart.length === 0) {
+      customerDisplayChannel.emit({
+        tipo: "STANDBY",
+        cajaNombre: registerName,
+        cajeroNombre: cashierName,
+        clienteNombre: customerName,
+        items: [],
+        total: 0,
+      });
+    } else {
+      customerDisplayChannel.emit({
+        tipo: "UPDATE_CART",
+        cajaNombre: registerName,
+        cajeroNombre: cashierName,
+        clienteNombre: customerName,
+        items: promoCalculation.items.map((i) => ({
+          id: i.id,
+          sku: i.sku,
+          nombre: i.nombre,
+          cantidad: i.cantidad,
+          precioUnitario: i.precioFinalUnitario,
+          total: i.total,
+          promoAplicada: i.promoAplicada,
+        })),
+        subtotal,
+        igv,
+        ahorroPromociones: promoSavings,
+        descuentoPuntos: pointsDiscount,
+        puntosGanados: promoCalculation.puntosAcumuladosVenta,
+        total,
+      });
+    }
+  }, [
+    cart,
+    promoCalculation,
+    customerName,
+    registerName,
+    cashierName,
+    subtotal,
+    igv,
+    promoSavings,
+    pointsDiscount,
+    total,
+  ]);
+
+  const handleHoldCurrentCart = (alias: string) => {
+    if (cart.length === 0) return;
+    const newHeld: HeldCart = {
+      id: `held-${Date.now()}`,
+      alias,
+      items: [...cart],
+      docType,
+      customerDoc,
+      customerName,
+      customerPoints,
+      timestamp: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
+      total,
+    };
+    setHeldCarts((prev) => [newHeld, ...prev]);
+    setCart([]);
+    setCustomerDoc("");
+    setCustomerName("Clientes Varios");
+    setCustomerPoints(0);
+    setIsPointsRedeemActive(false);
+    setCashReceived("");
+  };
+
+  const handleResumeCart = (held: HeldCart) => {
+    if (cart.length > 0) {
+      handleHoldCurrentCart(`Espera previa #${heldCarts.length + 1}`);
+    }
+    setCart(held.items);
+    setDocType(held.docType);
+    setCustomerDoc(held.customerDoc);
+    setCustomerName(held.customerName);
+    setCustomerPoints(held.customerPoints);
+    setHeldCarts((prev) => prev.filter((c) => c.id !== held.id));
+  };
+
+  const handleDeleteHeldCart = (cartId: string) => {
+    setHeldCarts((prev) => prev.filter((c) => c.id !== cartId));
+  };
 
   const cashNum = parseFloat(cashReceived) || 0;
   const change = Math.max(0, cashNum - total);
@@ -528,6 +622,20 @@ export default function PosPage() {
 
         setCompletedTicket(res.ticketData);
         setIsTicketDialogOpen(true);
+
+        // Emit sale completed event to Customer Display
+        customerDisplayChannel.emit({
+          tipo: "SALE_COMPLETED",
+          cajaNombre: registerName,
+          cajeroNombre: cashierName,
+          clienteNombre: customerName,
+          total,
+          medioPago: selectedPayment,
+          montoRecibido: cashNum,
+          vuelto: change,
+          comprobante: res.comprobanteSerieNumero,
+        });
+
         setCart([]);
         setCashReceived("");
         setSplitPaymentsList(null);
@@ -707,6 +815,25 @@ export default function PosPage() {
             </button>
           ) : (
             <>
+              <button
+                onClick={() => setIsHoldCartsOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-800/60 bg-amber-950/40 text-xs font-bold text-amber-300 hover:bg-amber-900/60 transition-colors cursor-pointer"
+                title="Carritos en espera (Parking de Ventas)"
+              >
+                <Clock className="size-3.5" /> Espera
+                {heldCarts.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black animate-pulse">
+                    {heldCarts.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => customerDisplayChannel.openCustomerWindow()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-800/60 bg-blue-950/40 text-xs font-bold text-blue-300 hover:bg-blue-900/60 transition-colors cursor-pointer"
+                title="Abrir pantalla secundaria para el cliente (Pole Display)"
+              >
+                <Monitor className="size-3.5 text-blue-400" /> Pantalla Cliente
+              </button>
               <button
                 onClick={() => setIsPrinterSettingsOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/90 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
@@ -1224,6 +1351,17 @@ export default function PosPage() {
       <PrinterSettingsDialog
         isOpen={isPrinterSettingsOpen}
         onClose={() => setIsPrinterSettingsOpen(false)}
+      />
+
+      {/* Held Carts / Parking de Ventas Modal */}
+      <HoldCartsDialog
+        isOpen={isHoldCartsOpen}
+        onClose={() => setIsHoldCartsOpen(false)}
+        heldCarts={heldCarts}
+        onResumeCart={handleResumeCart}
+        onDeleteHeldCart={handleDeleteHeldCart}
+        onHoldCurrentCart={handleHoldCurrentCart}
+        canHoldCurrent={cart.length > 0}
       />
     </div>
   );
