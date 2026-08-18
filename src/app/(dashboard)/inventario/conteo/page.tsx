@@ -31,12 +31,17 @@ import {
   InventoryCountItem,
 } from "@/actions/inventory-count-actions";
 
+import { useQueryState, parseAsString } from "nuqs";
+
 export default function InventarioConteoPage() {
   const [session, setSession] = useState<InventoryAuditSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"todos" | "con_diferencias" | "por_vencer">("todos");
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  const [filterType, setFilterType] = useQueryState<"todos" | "con_diferencias" | "por_vencer">(
+    "filtro",
+    parseAsString.withDefault("todos") as any
+  );
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [motivoAjuste, setMotivoAjuste] = useState("Regularización por toma de inventario físico");
   const [isSubmitting, setIsSubmitting] = useState(false);

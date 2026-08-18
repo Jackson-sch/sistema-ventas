@@ -25,12 +25,17 @@ import {
   SireOverviewData,
 } from "@/actions/sire-actions";
 
+import { useQueryState, parseAsString } from "nuqs";
+
 export default function SireSunatPage() {
   const [data, setData] = useState<SireOverviewData | null>(null);
-  const [año, setAño] = useState("2026");
-  const [mes, setMes] = useState("08");
+  const [año, setAño] = useQueryState("anio", parseAsString.withDefault("2026"));
+  const [mes, setMes] = useQueryState("mes", parseAsString.withDefault("08"));
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ventas" | "compras" | "validador">("ventas");
+  const [activeTab, setActiveTab] = useQueryState<"ventas" | "compras" | "validador">(
+    "tab",
+    parseAsString.withDefault("ventas") as any
+  );
   const [showRawTxt, setShowRawTxt] = useState(false);
 
   const loadData = async () => {

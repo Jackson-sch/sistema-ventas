@@ -45,13 +45,15 @@ interface InventoryProduct {
   isPerecible: boolean;
 }
 
+import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+
 export default function InventarioPage() {
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  const [selectedCategory, setSelectedCategory] = useQueryState("categoria", parseAsString.withDefault("Todas"));
+  const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
 
   // Dialogs state
   const [isFormOpen, setIsFormOpen] = useState(false);

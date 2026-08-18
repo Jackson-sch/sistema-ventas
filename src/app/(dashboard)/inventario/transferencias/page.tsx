@@ -87,10 +87,15 @@ const AVAILABLE_PRODUCTS = [
   { id: "5", sku: "775055566677", nombre: "Detergente Bolívar 1kg", stock: 150, unidad: "und", peso: 1.00 },
 ];
 
+import { useQueryState, parseAsString } from "nuqs";
+
 export default function TransferenciasPage() {
   const [transfers, setTransfers] = useState<TransferRecord[]>(DEMO_TRANSFERS);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "en_transito" | "completada">("all");
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  const [filterStatus, setFilterStatus] = useQueryState<"all" | "en_transito" | "completada">(
+    "estado",
+    parseAsString.withDefault("all") as any
+  );
 
   // Selected Transfer for GRE view
   const [selectedTransfer, setSelectedTransfer] = useState<TransferRecord | null>(null);

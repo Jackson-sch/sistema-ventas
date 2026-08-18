@@ -31,13 +31,15 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { getClientsData } from "@/actions/data-fetchers";
 import { upsertClientAction, deleteClientAction } from "@/actions/client-actions";
 
+import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+
 export default function ClientesPage() {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  const [filterCategory, setFilterCategory] = useQueryState("categoria", parseAsString.withDefault("all"));
+  const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
 
   // Form modal
   const [isFormOpen, setIsFormOpen] = useState(false);

@@ -179,12 +179,14 @@ const INITIAL_SALES: SaleRecord[] = [
   },
 ];
 
+import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+
 export default function VentasPage() {
   const [sales, setSales] = useState<SaleRecord[]>(INITIAL_SALES);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterDoc, setFilterDoc] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  const [filterDoc, setFilterDoc] = useQueryState("tipo", parseAsString.withDefault("all"));
+  const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
 
   // Thermal Ticket modal state
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);

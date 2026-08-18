@@ -192,12 +192,14 @@ const INITIAL_KARDEX_DATA: KardexRecord[] = [
   },
 ];
 
+import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+
 export default function KardexPage() {
   const [kardexRecords, setKardexRecords] = useState<KardexRecord[]>(INITIAL_KARDEX_DATA);
-  const [selectedProduct, setSelectedProduct] = useState<string>("all");
-  const [selectedOperation, setSelectedOperation] = useState<string>("all");
-  const [valuationMethod, setValuationMethod] = useState<"ponderado" | "peps">("ponderado");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProduct, setSelectedProduct] = useQueryState("prod", parseAsString.withDefault("all"));
+  const [selectedOperation, setSelectedOperation] = useQueryState("op", parseAsString.withDefault("all"));
+  const [valuationMethod, setValuationMethod] = useQueryState("metodo", parseAsString.withDefault("ponderado"));
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
 
   // Modal new movement
   const [isNewMovementOpen, setIsNewMovementOpen] = useState(false);
@@ -209,8 +211,8 @@ export default function KardexPage() {
   const [newMovReason, setNewMovReason] = useState("Merma por producto caducado / dañado");
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
 
   useEffect(() => {
     async function loadKardex() {

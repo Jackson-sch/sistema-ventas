@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -30,7 +31,9 @@ export default function RootLayout({
   return (
     <html lang="es" className={`dark ${jakarta.variable} ${geistMono.variable}`}>
       <body className="antialiased min-h-screen bg-[hsl(224,71%,4%)] text-slate-100 font-sans selection:bg-blue-600 selection:text-white">
-        {children}
+        <NuqsAdapter>
+          {children}
+        </NuqsAdapter>
         <Toaster richColors position="top-right" theme="dark" closeButton />
       </body>
     </html>
