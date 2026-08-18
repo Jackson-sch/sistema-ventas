@@ -64,6 +64,10 @@ export default function LoginPage() {
       return;
     }
 
+    if (typeof window !== "undefined") {
+      localStorage.setItem("novamarket_active_role", "cajero");
+    }
+
     setIsLoading(true);
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 800)),
@@ -88,6 +92,13 @@ export default function LoginPage() {
 
     setIsLoading(true);
     const isSuperadmin = email.includes("superadmin");
+    const isSupervisor = email.includes("supervisor") || email.includes("maria");
+    const selectedRole = isSuperadmin ? "superadmin" : isSupervisor ? "supervisor" : "admin";
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("novamarket_active_role", selectedRole);
+    }
+
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 900)),
       {
