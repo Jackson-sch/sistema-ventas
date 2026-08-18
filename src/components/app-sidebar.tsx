@@ -204,10 +204,15 @@ const storeNavigationGroups: NavGroup[] = [
         icon: LayoutDashboard,
       },
       {
-        title: "Reportes & SIRE SUNAT",
+        title: "Reportes & Analítica",
         url: "/reportes",
+        icon: BarChart3,
+      },
+      {
+        title: "Libros SUNAT SIRE",
+        url: "/reportes/sire",
         icon: FileSpreadsheet,
-        badge: "14.1",
+        badge: "14.1 / 8.1",
         badgeVariant: "default",
       },
       {
