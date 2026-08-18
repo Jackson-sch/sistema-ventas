@@ -44,7 +44,7 @@ export interface TicketData {
     total: number;
     unidad: string;
   }[];
-  medioPago: "efectivo" | "tarjeta" | "yape" | "plin" | "mixto";
+  medioPago: "efectivo" | "tarjeta" | "yape" | "plin" | "mixto" | "credito";
   pagos?: TicketPaymentItem[];
   montoRecibido?: number;
   vuelto?: number;

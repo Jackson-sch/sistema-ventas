@@ -30,7 +30,7 @@ export interface SaleTransactionInput {
   clienteId?: string;
   clienteDoc: string;
   clienteNombre: string;
-  medioPago: "efectivo" | "tarjeta" | "yape" | "plin" | "transferencia" | "mixto";
+  medioPago: "efectivo" | "tarjeta" | "yape" | "plin" | "transferencia" | "mixto" | "credito";
   pagos?: SplitPaymentInput[];
   montoRecibido?: number;
   vuelto?: number;
@@ -120,7 +120,7 @@ export async function completeSaleTransactionAction(
       totalInafectas: 0,
       totalIgv: igv,
       totalVenta,
-      medioPago: input.medioPago === "mixto" ? "efectivo" : input.medioPago,
+      medioPago: input.medioPago === "mixto" ? "efectivo" : input.medioPago === "credito" ? "transferencia" : input.medioPago,
     };
 
     const sunatResult = buildUblXml(sunatDocData);

@@ -65,6 +65,11 @@ import {
   getQuotationByIdAction,
   markQuotationAsConvertedAction,
 } from "@/actions/quotation-actions";
+import {
+  getCreditAccountByClientDocAction,
+  registerCreditSaleChargeAction,
+  CustomerCreditAccount,
+} from "@/actions/customer-credit-actions";
 import { useQueryState, parseAsString } from "nuqs";
 
 interface CartItem {
@@ -107,12 +112,13 @@ export default function PosPage() {
   const [clients, setClients] = useState<PosClient[]>(DEMO_CLIENTS);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [selectedPayment, setSelectedPayment] = useState<"efectivo" | "tarjeta" | "yape" | "plin" | "mixto">("efectivo");
+  const [selectedPayment, setSelectedPayment] = useState<"efectivo" | "tarjeta" | "yape" | "plin" | "mixto" | "credito">("efectivo");
   const [cashReceived, setCashReceived] = useState<string>("50");
   const [docType, setDocType] = useState<"boleta" | "factura">("boleta");
   const [customerName, setCustomerName] = useState("Clientes Varios");
   const [customerDoc, setCustomerDoc] = useState("00000000");
   const [customerPoints, setCustomerPoints] = useState(0);
+  const [activeCreditAccount, setActiveCreditAccount] = useState<CustomerCreditAccount | null>(null);
 
   // Cash Shift State
   const [isShiftOpen, setIsShiftOpen] = useState(true);
@@ -521,6 +527,26 @@ export default function PosPage() {
       return;
     }
 
+    if (selectedPayment === "credito") {
+      if (customerDoc === "00000000" || customerName === "Clientes Varios") {
+        toast.error("Debe ingresar el DNI o RUC del cliente para una venta al crédito.");
+        return;
+      }
+      const acc = await getCreditAccountByClientDocAction(customerDoc);
+      if (!acc) {
+        toast.error("El cliente no cuenta con una línea de crédito activa.");
+        return;
+      }
+      if (acc.estado === "bloqueado") {
+        toast.error("La cuenta de crédito del cliente está BLOQUEADA por morosidad.");
+        return;
+      }
+      if (acc.creditoDisponible < total) {
+        toast.error(`Crédito insuficiente. Disponible: S/ ${acc.creditoDisponible.toFixed(2)} vs Total: S/ ${total.toFixed(2)}.`);
+        return;
+      }
+    }
+
     setIsProcessingSale(true);
     try {
       // Automatic Offline Handling if no internet
@@ -676,6 +702,19 @@ export default function PosPage() {
           markQuotationAsConvertedAction(loadedQuotationId, res.comprobanteSerieNumero);
           setLoadedQuotationId(null);
           setCotizacionParam(null);
+        }
+
+        // If this sale was on Credit, record the charge to the client's credit account
+        if (selectedPayment === "credito") {
+          registerCreditSaleChargeAction({
+            clienteDoc: customerDoc,
+            clienteNombre: customerName,
+            clienteTipoDoc: docType === "factura" ? "RUC" : "DNI",
+            montoVenta: total,
+            comprobanteSerieNumero: res.comprobanteSerieNumero,
+            cajeroNombre: cashierName,
+          });
+          setActiveCreditAccount(null);
         }
 
         setCart([]);
@@ -1156,11 +1195,11 @@ export default function PosPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedPayment("efectivo")}
-                  className={`flex items-center p-2.5 rounded-xl border text-xs font-bold gap-2 transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[11px] font-bold gap-1 transition-all cursor-pointer ${
                     selectedPayment === "efectivo"
                       ? "border-blue-500 bg-blue-600/20 text-blue-400 shadow-md shadow-blue-500/20"
                       : "border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white"
@@ -1172,26 +1211,53 @@ export default function PosPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedPayment("tarjeta")}
-                  className={`flex items-center p-2.5 rounded-xl border text-xs font-bold gap-2 transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[11px] font-bold gap-1 transition-all cursor-pointer ${
                     selectedPayment === "tarjeta"
                       ? "border-blue-500 bg-blue-600/20 text-blue-400 shadow-md shadow-blue-500/20"
                       : "border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white"
                   }`}
                 >
                   <CreditCard className="size-4 shrink-0 text-blue-400" />
-                  <span>💳 Tarjeta POS</span>
+                  <span>💳 Tarjeta</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPayment("yape")}
-                  className={`flex items-center p-2.5 rounded-xl border text-xs font-bold gap-2 transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[11px] font-bold gap-1 transition-all cursor-pointer ${
                     selectedPayment === "yape"
                       ? "border-blue-500 bg-blue-600/20 text-blue-400 shadow-md shadow-blue-500/20"
                       : "border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white"
                   }`}
                 >
                   <QrCode className="size-4 shrink-0 text-purple-400" />
-                  <span>🟣 Yape / Plin</span>
+                  <span>🟣 Yape/Plin</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (customerDoc === "00000000" || customerName === "Clientes Varios") {
+                      toast.error("Seleccione un cliente identificado con DNI o RUC para venta al crédito.");
+                      return;
+                    }
+                    const acc = await getCreditAccountByClientDocAction(customerDoc);
+                    if (acc) {
+                      setActiveCreditAccount(acc);
+                      if (acc.estado === "bloqueado") {
+                        toast.error("La cuenta de crédito del cliente está BLOQUEADA.");
+                      } else {
+                        toast.info(`Línea activa: Disponible ${formatCurrency(acc.creditoDisponible)}`);
+                      }
+                    }
+                    setSelectedPayment("credito");
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[11px] font-bold gap-1 transition-all cursor-pointer ${
+                    selectedPayment === "credito"
+                      ? "border-rose-500 bg-rose-600/20 text-rose-300 shadow-md shadow-rose-500/20"
+                      : "border-slate-800 bg-slate-950/60 text-slate-400 hover:text-rose-300"
+                  }`}
+                >
+                  <CreditCard className="size-4 shrink-0 text-rose-400" />
+                  <span>📋 Crédito / Fiado</span>
                 </button>
                 <button
                   type="button"
@@ -1199,17 +1265,32 @@ export default function PosPage() {
                     setSelectedPayment("mixto");
                     setIsSplitPaymentOpen(true);
                   }}
-                  className={`flex items-center p-2.5 rounded-xl border text-xs font-bold gap-2 transition-all cursor-pointer ${
+                  className={`col-span-2 flex items-center justify-center p-2 rounded-xl border text-[11px] font-bold gap-2 transition-all cursor-pointer ${
                     selectedPayment === "mixto"
                       ? "border-amber-500 bg-amber-600/20 text-amber-300 shadow-md shadow-amber-500/20"
                       : "border-slate-800 bg-slate-950/60 text-slate-400 hover:text-amber-300"
                   }`}
                 >
                   <ArrowRightLeft className="size-4 shrink-0 text-amber-400" />
-                  <span>🔀 Pago Mixto</span>
+                  <span>🔀 Cobro Mixto</span>
                 </button>
               </div>
             </div>
+
+            {/* Credit Account Info Pill */}
+            {selectedPayment === "credito" && (
+              <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-800/50 text-xs space-y-1">
+                <div className="flex items-center justify-between font-bold text-rose-300">
+                  <span>Línea de Crédito Cliente:</span>
+                  <span className="font-mono">
+                    {activeCreditAccount ? formatCurrency(activeCreditAccount.creditoDisponible) : "Consultando..."}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Plazo de pago: <strong className="text-white">{activeCreditAccount?.diasPlazo || 30} días</strong> • Condición SUNAT: Crédito
+                </div>
+              </div>
+            )}
 
             {/* Split Payment Active Details Card */}
             {selectedPayment === "mixto" && (

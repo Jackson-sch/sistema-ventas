@@ -19,6 +19,7 @@ import {
   Crown,
   Activity,
   ClipboardCheck,
+  CreditCard,
 } from "lucide-react";
 import { type NavGroup } from "@/components/nav-main";
 
@@ -101,6 +102,13 @@ export const supervisorNavigationGroups: NavGroup[] = [
         title: "Clientes & Puntos",
         url: "/clientes",
         icon: Users,
+      },
+      {
+        title: "Créditos & Cobranzas",
+        url: "/clientes/creditos",
+        icon: CreditCard,
+        badge: "Fiado",
+        badgeVariant: "default",
       },
     ],
   },
@@ -187,6 +195,13 @@ export const adminNavigationGroups: NavGroup[] = [
         title: "Clientes & Puntos",
         url: "/clientes",
         icon: Users,
+      },
+      {
+        title: "Créditos & Cobranzas",
+        url: "/clientes/creditos",
+        icon: CreditCard,
+        badge: "Fiado",
+        badgeVariant: "default",
       },
     ],
   },
@@ -440,6 +455,7 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/ventas/cotizaciones",
     "/ventas/resumenes",
     "/clientes",
+    "/clientes/creditos",
     "/inventario",
     "/inventario/promociones",
     "/inventario/conteo",
@@ -456,6 +472,7 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/ventas/cotizaciones",
     "/ventas/resumenes",
     "/clientes",
+    "/clientes/creditos",
     "/inventario",
     "/inventario/promociones",
     "/inventario/transferencias",
