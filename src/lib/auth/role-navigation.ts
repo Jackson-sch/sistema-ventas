@@ -147,6 +147,13 @@ export const supervisorNavigationGroups: NavGroup[] = [
         badge: "SUNAT",
         badgeVariant: "default",
       },
+      {
+        title: "Órdenes de Compra",
+        url: "/compras/ordenes",
+        icon: Truck,
+        badge: "Muelle",
+        badgeVariant: "default",
+      },
     ],
   },
   {
@@ -232,6 +239,13 @@ export const adminNavigationGroups: NavGroup[] = [
         title: "Compras & Proveedores",
         url: "/compras",
         icon: Truck,
+      },
+      {
+        title: "Órdenes de Compra",
+        url: "/compras/ordenes",
+        icon: Truck,
+        badge: "Muelle",
+        badgeVariant: "default",
       },
       {
         title: "Transferencias & GRE",
@@ -476,6 +490,7 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/inventario/conteo",
     "/inventario/etiquetas",
     "/inventario/mermas",
+    "/compras/ordenes",
     "/dashboard",
     "/reportes",
     "/consultas",
@@ -497,6 +512,7 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/inventario/etiquetas",
     "/inventario/mermas",
     "/compras",
+    "/compras/ordenes",
     "/dashboard",
     "/reportes",
     "/reportes/sire",
