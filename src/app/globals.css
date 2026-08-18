@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  :root {
+    /* Obsidian Executive Luxury Palette (Default Dark Aesthetic) */
+    --background: hsl(224 71% 4%);
+    --foreground: hsl(210 40% 98%);
+    --card: hsl(224 71% 7%);
+    --card-foreground: hsl(210 40% 98%);
+    --popover: hsl(224 71% 7%);
+    --popover-foreground: hsl(210 40% 98%);
+
+    /* Vibrant Brand Sapphire */
+    --primary: hsl(217 91% 60%);
+    --primary-foreground: hsl(224 71% 4%);
+
+    /* Secondary & Muted Surfaces */
+    --secondary: hsl(217 33% 14%);
+    --secondary-foreground: hsl(210 40% 98%);
+    --muted: hsl(217 33% 12%);
+    --muted-foreground: hsl(215 20% 65%);
+    --accent: hsl(217 33% 16%);
+    --accent-foreground: hsl(210 40% 98%);
+
+    /* Destructive */
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(210 40% 98%);
+
+    /* Borders & Inputs */
+    --border: hsl(217 33% 16%);
+    --input: hsl(217 33% 16%);
+    --ring: hsl(217 91% 60%);
+    --radius: 0.875rem;
+
+    /* Retail POS High-Contrast Tokens */
+    --pos-success: hsl(158 75% 45%);
+    --pos-warning: hsl(38 92% 52%);
+    --pos-danger: hsl(0 84% 60%);
+    --pos-accent: hsl(217 91% 60%);
+
+    /* Chart Palettes (Luminescent Spectra) */
+    --chart-1: hsl(217 91% 60%);
+    --chart-2: hsl(158 75% 45%);
+    --chart-3: hsl(38 92% 52%);
+    --chart-4: hsl(262 83% 68%);
+    --chart-5: hsl(199 89% 58%);
+
+    /* Sidebar Theme - Deep Obsidian */
+    --sidebar: hsl(224 71% 5%);
+    --sidebar-foreground: hsl(210 40% 92%);
+    --sidebar-primary: hsl(217 91% 60%);
+    --sidebar-primary-foreground: hsl(224 71% 4%);
+    --sidebar-accent: hsl(217 33% 14%);
+    --sidebar-accent-foreground: hsl(210 40% 98%);
+    --sidebar-border: hsl(217 33% 13%);
+    --sidebar-ring: hsl(217 91% 60%);
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+code, kbd, samp, pre, .font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+/* Glass card styling */
+.glass-panel {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(217 33% 22%);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(217 33% 32%);
+}
+
+/* ── Remove default browser arrows/spinners on number inputs ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
