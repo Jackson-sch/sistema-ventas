@@ -20,6 +20,7 @@ import {
   Activity,
   ClipboardCheck,
   CreditCard,
+  Scale,
 } from "lucide-react";
 import { type NavGroup } from "@/components/nav-main";
 
@@ -139,6 +140,13 @@ export const supervisorNavigationGroups: NavGroup[] = [
         url: "/inventario/etiquetas",
         icon: Tag,
       },
+      {
+        title: "Mermas & Desmedros",
+        url: "/inventario/mermas",
+        icon: Scale,
+        badge: "SUNAT",
+        badgeVariant: "default",
+      },
     ],
   },
   {
@@ -248,6 +256,13 @@ export const adminNavigationGroups: NavGroup[] = [
         title: "Etiquetas & Góndolas",
         url: "/inventario/etiquetas",
         icon: Tag,
+      },
+      {
+        title: "Mermas & Desmedros",
+        url: "/inventario/mermas",
+        icon: Scale,
+        badge: "SUNAT",
+        badgeVariant: "default",
       },
     ],
   },
@@ -460,6 +475,7 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/inventario/promociones",
     "/inventario/conteo",
     "/inventario/etiquetas",
+    "/inventario/mermas",
     "/dashboard",
     "/reportes",
     "/consultas",
@@ -479,6 +495,7 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/inventario/kardex",
     "/inventario/conteo",
     "/inventario/etiquetas",
+    "/inventario/mermas",
     "/compras",
     "/dashboard",
     "/reportes",
