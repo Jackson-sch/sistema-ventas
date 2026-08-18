@@ -121,6 +121,7 @@ export function ThermalTicketDialog({
         {/* Realistic 80mm Thermal Paper Container */}
         <div className="flex justify-center p-2 bg-slate-950/60 rounded-2xl border border-slate-800/80">
           <div
+            id="printable-thermal-ticket"
             ref={printRef}
             className="w-[340px] bg-[#f8fafc] text-[#0f172a] p-5 rounded-md shadow-xl font-mono text-xs leading-relaxed select-none relative"
             style={{

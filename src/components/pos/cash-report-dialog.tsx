@@ -101,6 +101,7 @@ export function CashReportDialog({ isOpen, onClose, report }: CashReportDialogPr
 
         {/* Physical 80mm Thermal Receipt Simulation */}
         <div
+          id="printable-cash-report"
           ref={printRef}
           className="bg-white text-black p-5 rounded-2xl shadow-xl font-mono text-xs space-y-3 select-all border border-slate-300"
         >
