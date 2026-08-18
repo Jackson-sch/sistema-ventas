@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Sparkles,
   Trash2,
+  Edit2,
   ExternalLink,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
@@ -27,10 +28,13 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { QuotationSheetDialog } from "@/components/ventas/quotation-sheet-dialog";
 import {
   getQuotationsAction,
   createQuotationAction,
+  updateQuotationAction,
+  deleteQuotationAction,
   QuotationRecord,
   QuotationItem,
 } from "@/actions/quotation-actions";
@@ -53,9 +57,14 @@ export default function CotizacionesPage() {
   // Modals
   const [selectedQuotation, setSelectedQuotation] = useState<QuotationRecord | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingQuotation, setEditingQuotation] = useState<QuotationRecord | null>(null);
 
-  // New Quotation Form State
+  // Delete modal state
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [quotationToDelete, setQuotationToDelete] = useState<QuotationRecord | null>(null);
+
+  // Form State
   const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
   const [availableClients, setAvailableClients] = useState<any[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -67,7 +76,7 @@ export default function CotizacionesPage() {
   const [formItems, setFormItems] = useState<QuotationItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedProductQty, setSelectedProductQty] = useState(1);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -90,6 +99,34 @@ export default function CotizacionesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleOpenNewModal = () => {
+    setEditingQuotation(null);
+    setSelectedClientId("");
+    setClientDoc("");
+    setClientName("");
+    setClientTypeDoc("DNI");
+    setClientPhone("");
+    setValidityDays(7);
+    setFormItems([]);
+    setSelectedProductId("");
+    setSelectedProductQty(1);
+    setIsFormModalOpen(true);
+  };
+
+  const handleOpenEditModal = (q: QuotationRecord) => {
+    setEditingQuotation(q);
+    setSelectedClientId("");
+    setClientDoc(q.clienteDoc);
+    setClientName(q.clienteNombre);
+    setClientTypeDoc(q.clienteTipoDoc);
+    setClientPhone(q.clienteTelefono || "");
+    setValidityDays(7);
+    setFormItems([...q.items]);
+    setSelectedProductId("");
+    setSelectedProductQty(1);
+    setIsFormModalOpen(true);
+  };
 
   const handleAddItemToForm = () => {
     if (!selectedProductId) return;
@@ -132,7 +169,7 @@ export default function CotizacionesPage() {
     }
   };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName || !clientDoc) {
       toast.error("Ingrese el nombre y documento del cliente.");
@@ -143,30 +180,63 @@ export default function CotizacionesPage() {
       return;
     }
 
-    setIsCreating(true);
+    setIsSubmitting(true);
     try {
-      const res = await createQuotationAction({
-        clienteDoc: clientDoc,
-        clienteNombre: clientName,
-        clienteTipoDoc: clientTypeDoc,
-        clienteTelefono: clientPhone,
-        diasValidez: validityDays,
-        items: formItems,
-      });
+      if (editingQuotation) {
+        const res = await updateQuotationAction({
+          id: editingQuotation.id,
+          clienteDoc: clientDoc,
+          clienteNombre: clientName,
+          clienteTipoDoc: clientTypeDoc,
+          clienteTelefono: clientPhone,
+          diasValidez: validityDays,
+          items: formItems,
+        });
 
-      if (res.success) {
-        toast.success(`Cotización ${res.quotation.codigo} generada exitosamente.`);
-        setIsNewModalOpen(false);
-        setFormItems([]);
-        setSelectedClientId("");
-        setClientDoc("");
-        setClientName("");
-        loadData();
+        if (res.success && res.quotation) {
+          toast.success(`Cotización ${res.quotation.codigo} actualizada con éxito.`);
+          setIsFormModalOpen(false);
+          loadData();
+        } else {
+          toast.error(res.error || "Error al actualizar cotización.");
+        }
+      } else {
+        const res = await createQuotationAction({
+          clienteDoc: clientDoc,
+          clienteNombre: clientName,
+          clienteTipoDoc: clientTypeDoc,
+          clienteTelefono: clientPhone,
+          diasValidez: validityDays,
+          items: formItems,
+        });
+
+        if (res.success) {
+          toast.success(`Cotización ${res.quotation.codigo} generada exitosamente.`);
+          setIsFormModalOpen(false);
+          loadData();
+        }
       }
     } catch {
-      toast.error("Error al crear la cotización.");
+      toast.error("Error al procesar la cotización.");
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!quotationToDelete) return;
+    try {
+      const res = await deleteQuotationAction(quotationToDelete.id);
+      if (res.success) {
+        toast.success(`Cotización ${quotationToDelete.codigo} anulada y eliminada.`);
+        setIsDeleteOpen(false);
+        setQuotationToDelete(null);
+        loadData();
+      } else {
+        toast.error(res.error || "Error al eliminar la cotización.");
+      }
+    } catch {
+      toast.error("Error de servidor al eliminar cotización.");
     }
   };
 
@@ -215,13 +285,13 @@ export default function CotizacionesPage() {
             <FileText className="size-6 text-blue-400" /> Cotizaciones & Proformas Comerciales
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Emisión de proformas con vigencia, envío por WhatsApp y conversión a venta directa en Caja POS
+            Emisión, edición, corrección, envío por WhatsApp y conversión a venta directa en Caja POS
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setIsNewModalOpen(true)}
+          onClick={handleOpenNewModal}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
         >
           <Plus className="size-4" /> Nueva Proforma / Cotización
@@ -431,6 +501,29 @@ export default function CotizacionesPage() {
                         >
                           <Printer className="size-3.5" />
                         </button>
+                        {q.estado !== "convertida" && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(q)}
+                            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Editar Proforma (Corregir productos o cliente)"
+                          >
+                            <Edit2 className="size-3.5" />
+                          </button>
+                        )}
+                        {q.estado !== "convertida" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuotationToDelete(q);
+                              setIsDeleteOpen(true);
+                            }}
+                            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            title="Anular y Eliminar Proforma"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -456,18 +549,29 @@ export default function CotizacionesPage() {
         quotation={selectedQuotation}
       />
 
-      {/* New Quotation Modal */}
-      {isNewModalOpen && (
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmDialog
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="¿Anular y Eliminar Cotización?"
+        description="Esta acción eliminará el registro de la proforma seleccionada."
+        itemName={quotationToDelete ? `${quotationToDelete.codigo} — Cliente: ${quotationToDelete.clienteNombre} (${formatCurrency(quotationToDelete.total)})` : undefined}
+      />
+
+      {/* Create / Edit Quotation Modal */}
+      {isFormModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-2xl bg-[hsl(224,71%,4%)] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Plus className="size-5 text-blue-400" /> Crear Nueva Cotización / Proforma
+                <FileText className="size-5 text-blue-400" />
+                {editingQuotation ? `Editar Proforma ${editingQuotation.codigo}` : "Crear Nueva Cotización / Proforma"}
               </h3>
-              <button onClick={() => setIsNewModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
               {/* Client Selection */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -616,18 +720,18 @@ export default function CotizacionesPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsNewModalOpen(false)}
+                    onClick={() => setIsFormModalOpen(false)}
                     className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-300"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={isCreating}
+                    disabled={isSubmitting}
                     className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/30 flex items-center gap-1.5"
                   >
                     <CheckCircle2 className="size-4" />
-                    {isCreating ? "Guardando..." : "Emitir Proforma"}
+                    {isSubmitting ? "Guardando..." : editingQuotation ? "Guardar Cambios" : "Emitir Proforma"}
                   </button>
                 </div>
               </div>

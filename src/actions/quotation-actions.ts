@@ -173,3 +173,52 @@ export async function markQuotationAsConvertedAction(
   }
   return { success: true };
 }
+
+export async function updateQuotationAction(input: {
+  id: string;
+  clienteDoc: string;
+  clienteNombre: string;
+  clienteTipoDoc: "DNI" | "RUC";
+  clienteTelefono?: string;
+  clienteEmail?: string;
+  diasValidez: number;
+  items: QuotationItem[];
+  observaciones?: string;
+}): Promise<{ success: boolean; error?: string; quotation?: QuotationRecord }> {
+  const target = inMemoryQuotations.find((q) => q.id === input.id);
+  if (!target) return { success: false, error: "Cotización no encontrada." };
+
+  if (target.estado === "convertida") {
+    return { success: false, error: "No se puede editar una cotización que ya fue cobrada/convertida a venta." };
+  }
+
+  const total = +input.items.reduce((acc, i) => acc + i.total, 0).toFixed(2);
+  const subtotal = +(total / 1.18).toFixed(2);
+  const igv = +(total - subtotal).toFixed(2);
+
+  target.clienteDoc = input.clienteDoc;
+  target.clienteNombre = input.clienteNombre;
+  target.clienteTipoDoc = input.clienteTipoDoc;
+  target.clienteTelefono = input.clienteTelefono;
+  target.clienteEmail = input.clienteEmail;
+  target.items = input.items;
+  target.total = total;
+  target.subtotal = subtotal;
+  target.igv = igv;
+  if (input.observaciones) target.observaciones = input.observaciones;
+
+  revalidatePath("/ventas/cotizaciones");
+  return { success: true, quotation: target };
+}
+
+export async function deleteQuotationAction(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  const index = inMemoryQuotations.findIndex((q) => q.id === id);
+  if (index === -1) return { success: false, error: "Cotización no encontrada." };
+
+  inMemoryQuotations.splice(index, 1);
+  revalidatePath("/ventas/cotizaciones");
+  return { success: true };
+}
+

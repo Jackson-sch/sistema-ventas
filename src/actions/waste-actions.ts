@@ -196,3 +196,47 @@ export async function approveWasteRecordAction(
 
   return { success: true, nuevoEstado: record.estado };
 }
+
+export async function updateWasteRecordAction(input: {
+  id: string;
+  motivo: WasteReason;
+  sucursal: string;
+  responsable: string;
+  notarioColegiado?: string;
+  metodoDestruccion: string;
+  lugarDestruccion: string;
+  observaciones: string;
+  items: WasteItem[];
+}): Promise<{ success: boolean; error?: string; record?: WasteRecord }> {
+  const record = DEMO_WASTE_RECORDS.find((r) => r.id === input.id);
+  if (!record) return { success: false, error: "Acta de merma no encontrada." };
+
+  if (!input.items || input.items.length === 0) {
+    return { success: false, error: "Debe incluir al menos un producto en el acta." };
+  }
+
+  const costoTotalPerdida = +input.items.reduce((acc, i) => acc + i.costoTotal, 0).toFixed(2);
+
+  record.motivo = input.motivo;
+  record.sucursal = input.sucursal;
+  record.responsable = input.responsable;
+  record.notarioColegiado = input.notarioColegiado || record.notarioColegiado;
+  record.metodoDestruccion = input.metodoDestruccion;
+  record.lugarDestruccion = input.lugarDestruccion;
+  record.observaciones = input.observaciones;
+  record.items = input.items;
+  record.costoTotalPerdida = costoTotalPerdida;
+
+  return { success: true, record };
+}
+
+export async function deleteWasteRecordAction(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  const index = DEMO_WASTE_RECORDS.findIndex((r) => r.id === id);
+  if (index === -1) return { success: false, error: "Acta de merma no encontrada." };
+
+  DEMO_WASTE_RECORDS.splice(index, 1);
+  return { success: true };
+}
+

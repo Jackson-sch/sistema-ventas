@@ -25,10 +25,13 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { WasteDestructionActDialog } from "@/components/inventario/waste-destruction-act-dialog";
 import {
   getWasteRecordsAction,
   createWasteRecordAction,
+  updateWasteRecordAction,
+  deleteWasteRecordAction,
   approveWasteRecordAction,
   WasteRecord,
   WasteItem,
@@ -52,9 +55,14 @@ export default function MermasPage() {
   // Modals
   const [selectedRecord, setSelectedRecord] = useState<WasteRecord | null>(null);
   const [isActDialogOpen, setIsActDialogOpen] = useState(false);
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<WasteRecord | null>(null);
 
-  // New Record Form State
+  // Delete Confirm Modal
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<WasteRecord | null>(null);
+
+  // Form State
   const [formReason, setFormReason] = useState<WasteReason>("VENCIMIENTO");
   const [formLocation, setFormLocation] = useState("Almacén Central de Merma - Surco");
   const [formMethod, setFormMethod] = useState("Desnaturalización y disposición en relleno sanitario certificado");
@@ -64,7 +72,7 @@ export default function MermasPage() {
   const [selectedProdId, setSelectedProdId] = useState("");
   const [selectedQty, setSelectedQty] = useState(1);
   const [selectedBatch, setSelectedBatch] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -85,6 +93,34 @@ export default function MermasPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleOpenNewModal = () => {
+    setEditingRecord(null);
+    setFormReason("VENCIMIENTO");
+    setFormLocation("Almacén Central de Merma - Surco");
+    setFormMethod("Desnaturalización y disposición en relleno sanitario certificado");
+    setFormNotary("Sin Notario (Pérdida menor a 10 UIT)");
+    setFormObs("");
+    setFormItems([]);
+    setSelectedProdId("");
+    setSelectedQty(1);
+    setSelectedBatch("");
+    setIsFormModalOpen(true);
+  };
+
+  const handleOpenEditModal = (rec: WasteRecord) => {
+    setEditingRecord(rec);
+    setFormReason(rec.motivo);
+    setFormLocation(rec.lugarDestruccion);
+    setFormMethod(rec.metodoDestruccion);
+    setFormNotary(rec.notarioColegiado || "");
+    setFormObs(rec.observaciones);
+    setFormItems([...rec.items]);
+    setSelectedProdId("");
+    setSelectedQty(1);
+    setSelectedBatch("");
+    setIsFormModalOpen(true);
+  };
 
   const handleAddItemToForm = () => {
     if (!selectedProdId) return;
@@ -119,37 +155,61 @@ export default function MermasPage() {
     setFormItems(formItems.filter((_, i) => i !== idx));
   };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formItems.length === 0) {
-      toast.error("Agregue al menos un producto a dar de baja.");
+      toast.error("Agregue al menos un producto al acta.");
       return;
     }
 
-    setIsCreating(true);
+    setIsSubmitting(true);
     try {
-      const res = await createWasteRecordAction({
-        motivo: formReason,
-        sucursal: "Sucursal Central (Surco)",
-        responsable: "Carlos Alarcón (Supervisor de Turno)",
-        notarioColegiado: formNotary,
-        metodoDestruccion: formMethod,
-        lugarDestruccion: formLocation,
-        observaciones: formObs || "Baja formal de existencias no aptas para venta.",
-        items: formItems,
-      });
+      if (editingRecord) {
+        // Update existing record
+        const res = await updateWasteRecordAction({
+          id: editingRecord.id,
+          motivo: formReason,
+          sucursal: editingRecord.sucursal,
+          responsable: editingRecord.responsable,
+          notarioColegiado: formNotary,
+          metodoDestruccion: formMethod,
+          lugarDestruccion: formLocation,
+          observaciones: formObs || "Baja formal de existencias no aptas para venta.",
+          items: formItems,
+        });
 
-      if (res.success && res.record) {
-        toast.success(`Acta ${res.record.codigoActa} generada con éxito.`);
-        setIsNewModalOpen(false);
-        setFormItems([]);
-        setFormObs("");
-        loadData();
+        if (res.success && res.record) {
+          toast.success(`Acta ${res.record.codigoActa} actualizada correctamente.`);
+          setIsFormModalOpen(false);
+          loadData();
+        } else {
+          toast.error(res.error || "Error al actualizar el acta.");
+        }
+      } else {
+        // Create new record
+        const res = await createWasteRecordAction({
+          motivo: formReason,
+          sucursal: "Sucursal Central (Surco)",
+          responsable: "Carlos Alarcón (Supervisor de Turno)",
+          notarioColegiado: formNotary,
+          metodoDestruccion: formMethod,
+          lugarDestruccion: formLocation,
+          observaciones: formObs || "Baja formal de existencias no aptas para venta.",
+          items: formItems,
+        });
+
+        if (res.success && res.record) {
+          toast.success(`Acta ${res.record.codigoActa} generada con éxito.`);
+          setIsFormModalOpen(false);
+          loadData();
+        } else {
+          toast.error(res.error || "Error al registrar acta de merma.");
+        }
       }
     } catch {
-      toast.error("Error al registrar acta de merma.");
+      toast.error("Error al procesar el acta de merma.");
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -164,6 +224,23 @@ export default function MermasPage() {
       }
     } catch {
       toast.error("Error al aprobar acta.");
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return;
+    try {
+      const res = await deleteWasteRecordAction(recordToDelete.id);
+      if (res.success) {
+        toast.success(`Acta ${recordToDelete.codigoActa} anulada y eliminada.`);
+        setIsDeleteOpen(false);
+        setRecordToDelete(null);
+        loadData();
+      } else {
+        toast.error(res.error || "Error al eliminar el acta.");
+      }
+    } catch {
+      toast.error("Error de servidor al eliminar el acta.");
     }
   };
 
@@ -206,13 +283,13 @@ export default function MermasPage() {
             <Scale className="size-6 text-amber-400" /> Control de Mermas, Desmedros & Actas de Destrucción
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Registro de bajas de inventario por caducidad o rotura con generación de actas oficiales deducibles de renta
+            Registro, corrección, baja de inventario y formulación de actas oficiales deducibles del Impuesto a la Renta
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setIsNewModalOpen(true)}
+          onClick={handleOpenNewModal}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-600/30 transition-all cursor-pointer"
         >
           <Plus className="size-4 text-slate-950" /> Formular Nueva Acta de Merma
@@ -408,6 +485,25 @@ export default function MermasPage() {
                         >
                           <Printer className="size-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(r)}
+                          className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Editar Acta (Corregir cantidades o ítems)"
+                        >
+                          <Edit2 className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecordToDelete(r);
+                            setIsDeleteOpen(true);
+                          }}
+                          className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          title="Anular y Eliminar Acta"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -433,18 +529,29 @@ export default function MermasPage() {
         record={selectedRecord}
       />
 
-      {/* New Waste Modal */}
-      {isNewModalOpen && (
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmDialog
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="¿Anular y Eliminar Acta de Merma?"
+        description="Esta acción eliminará el registro del acta y anulará el impacto de baja de mercadería."
+        itemName={recordToDelete ? `${recordToDelete.codigoActa} — Pérdida: ${formatCurrency(recordToDelete.costoTotalPerdida)}` : undefined}
+      />
+
+      {/* Create / Edit Modal */}
+      {isFormModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-2xl bg-[hsl(224,71%,4%)] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Scale className="size-5 text-amber-400" /> Formular Acta de Desmedro / Merma
+                <Scale className="size-5 text-amber-400" />
+                {editingRecord ? `Editar Acta ${editingRecord.codigoActa}` : "Formular Nueva Acta de Merma"}
               </h3>
-              <button onClick={() => setIsNewModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-slate-300 font-bold">Causa / Motivo de la Baja:</label>
@@ -584,18 +691,18 @@ export default function MermasPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsNewModalOpen(false)}
+                    onClick={() => setIsFormModalOpen(false)}
                     className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-300"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={isCreating}
+                    disabled={isSubmitting}
                     className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-600/30 flex items-center gap-1.5 cursor-pointer"
                   >
                     <CheckCircle2 className="size-4" />
-                    {isCreating ? "Guardando..." : "Emitir Acta de Merma"}
+                    {isSubmitting ? "Guardando..." : editingRecord ? "Guardar Correcciones" : "Emitir Acta de Merma"}
                   </button>
                 </div>
               </div>
