@@ -117,7 +117,7 @@ export function QuotationSheetDialog({
         </div>
 
         {/* Printable Proforma Sheet */}
-        <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-6 text-xs">
+        <div id="printable-quotation-sheet" className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-6 text-xs">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between gap-4 pb-4 border-b border-slate-800">
             <div className="space-y-1">

@@ -95,7 +95,7 @@ export function CreditStatementDialog({
         </div>
 
         {/* Printable Area */}
-        <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800/80 space-y-6 text-xs text-slate-200">
+        <div id="printable-credit-statement" className="bg-slate-950 p-6 rounded-2xl border border-slate-800/80 space-y-6 text-xs text-slate-200">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pb-4 border-b border-slate-800">
             <div>
