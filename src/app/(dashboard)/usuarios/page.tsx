@@ -163,13 +163,13 @@ export default function UsuariosPage() {
           </button>
           <button
             onClick={() => handleOpenPermissions("Supervisor de Tienda")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors cursor-pointer"
           >
-            <Shield className="size-3.5 text-purple-400" /> Matriz de Permisos
+            <Shield className="size-3.5 text-indigo-400" /> Matriz de Permisos
           </button>
           <button
             onClick={handleOpenNewUser}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
             <Plus className="size-3.5" /> Nuevo Colaborador
           </button>
