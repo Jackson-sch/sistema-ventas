@@ -1,5 +1,10 @@
 "use server";
 
+import { db } from "@/db";
+import * as schema from "@/db/schema";
+import { desc, eq, and } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+
 export type WasteReason =
   | "VENCIMIENTO"
   | "ROTURA_TRANSPORTE"
@@ -106,37 +111,81 @@ let DEMO_WASTE_RECORDS: WasteRecord[] = [
       },
     ],
   },
-  {
-    id: "waste-003",
-    codigoActa: "ACTA-2026-0044",
-    fecha: "18/08/2026",
-    hora: "08:15",
-    motivo: "MERMA_PERECIBLE",
-    sucursal: "Sucursal Central (Surco)",
-    responsable: "María Gómez (Supervisora)",
-    notarioColegiado: "Sin Notario (Merma biológica frutas)",
-    metodoDestruccion: "Compostaje orgánico municipal",
-    lugarDestruccion: "Cámara de Frío de Perecibles",
-    costoTotalPerdida: 96.00,
-    estado: "BORRADOR",
-    observaciones: "Deshidratación natural y merma de fruta seleccionada no apta para góndola.",
-    items: [
-      {
-        productoId: "prod-4",
-        sku: "200000012345",
-        nombre: "Manzana Delicia Nacional (kg)",
-        cantidad: 30,
-        unidad: "kg",
-        costoUnit: 3.20,
-        costoTotal: 96.00,
-        lote: "LOTE-AGRO-09",
-        fechaVencimiento: "18/08/2026",
-      },
-    ],
-  },
 ];
 
 export async function getWasteRecordsAction(): Promise<WasteRecord[]> {
+  try {
+    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
+      const rows = await db
+        .select({
+          id: schema.movimientosInventario.id,
+          tipo: schema.movimientosInventario.tipo,
+          cantidad: schema.movimientosInventario.cantidad,
+          motivo: schema.movimientosInventario.motivo,
+          fecha: schema.movimientosInventario.creadoEn,
+          productoId: schema.movimientosInventario.productoId,
+          productoNombre: schema.productos.nombre,
+          sku: schema.productos.sku,
+          precioCosto: schema.productos.precioCosto,
+          unidadMedida: schema.productos.unidadMedida,
+          sucursalNombre: schema.sucursales.nombre,
+          usuarioNombre: schema.usuarios.nombre,
+        })
+        .from(schema.movimientosInventario)
+        .leftJoin(schema.productos, eq(schema.movimientosInventario.productoId, schema.productos.id))
+        .leftJoin(schema.sucursales, eq(schema.movimientosInventario.sucursalId, schema.sucursales.id))
+        .leftJoin(schema.usuarios, eq(schema.movimientosInventario.usuarioId, schema.usuarios.id))
+        .where(eq(schema.movimientosInventario.tipo, "merma"))
+        .orderBy(desc(schema.movimientosInventario.creadoEn));
+
+      if (rows && rows.length > 0) {
+        return rows.map((r, idx) => {
+          const qty = parseFloat(r.cantidad);
+          const unitCost = parseFloat(r.precioCosto || "3.50");
+          const totalLoss = +(qty * unitCost).toFixed(2);
+          const fechaD = new Date(r.fecha);
+
+          const motivoEnum: WasteReason = (r.motivo || "").toLowerCase().includes("venc")
+            ? "VENCIMIENTO"
+            : (r.motivo || "").toLowerCase().includes("rot")
+            ? "ROTURA_TRANSPORTE"
+            : "MERMA_PERECIBLE";
+
+          return {
+            id: r.id,
+            codigoActa: `ACTA-2026-${String(100 + idx).padStart(4, "0")}`,
+            fecha: fechaD.toLocaleDateString("es-PE"),
+            hora: fechaD.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
+            motivo: motivoEnum,
+            sucursal: r.sucursalNombre || "Sucursal Central (Surco)",
+            responsable: r.usuarioNombre ? `${r.usuarioNombre} (Responsable)` : "Supervisor de Turno",
+            notarioColegiado: totalLoss > 5000 ? "Dra. Carmen Salazar (Notaría 14 de Lima)" : "Sin Notario (Art. 37 LIR < 10 UIT)",
+            metodoDestruccion: "Desnaturalización e incineración controlada conforme Art. 37 LIR",
+            lugarDestruccion: "Almacén Central de Bajas & Mermas",
+            costoTotalPerdida: totalLoss,
+            estado: "DESTRUIDO_CON_ACTA" as WasteStatus,
+            observaciones: r.motivo || "Baja tributaria de mercadería dañada.",
+            items: [
+              {
+                productoId: r.productoId,
+                sku: r.sku || "SKU-001",
+                nombre: r.productoNombre || "Producto",
+                cantidad: qty,
+                unidad: (r.unidadMedida || "und").toLowerCase(),
+                costoUnit: unitCost,
+                costoTotal: totalLoss,
+                lote: "L-2026-MERMA",
+                fechaVencimiento: "15/08/2026",
+              },
+            ],
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("getWasteRecordsAction: DB fallback:", err);
+  }
+
   return DEMO_WASTE_RECORDS;
 }
 

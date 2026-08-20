@@ -1,5 +1,8 @@
 "use server";
 
+import { db } from "@/db";
+import * as schema from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export type PurchaseOrderStatus =
@@ -102,8 +105,8 @@ let DEMO_PURCHASE_ORDERS: PurchaseOrderRecord[] = [
         cantidadRecibida: 0,
         costoUnitario: 60.00,
         total: 720.00,
-        loteSugerido: "L-YOG-2026-44",
-        fechaVencimiento: "10/11/2026",
+        loteSugerido: "L-GLO-2026-90",
+        fechaVencimiento: "30/09/2026",
       },
     ],
     recepciones: [],
@@ -111,110 +114,184 @@ let DEMO_PURCHASE_ORDERS: PurchaseOrderRecord[] = [
   {
     id: "oc-002",
     codigoOC: "OC-2026-0088",
-    fechaEmision: "12/08/2026",
-    fechaEntregaEstimada: "16/08/2026",
+    fechaEmision: "10/08/2026",
+    fechaEntregaEstimada: "13/08/2026",
     proveedorId: "prov-2",
     proveedorRuc: "20100055237",
     proveedorRazonSocial: "ALICORP S.A.A.",
-    proveedorContacto: "Elena Ramos (Distribución)",
-    proveedorTelefono: "945123987",
-    proveedorEmail: "corporativo@alicorp.com.pe",
+    proveedorContacto: "Patricia Romero",
+    proveedorTelefono: "976543210",
+    proveedorEmail: "distribucion@alicorp.com.pe",
     condicionPago: "CREDITO_30D",
     moneda: "PEN",
     sucursalDestino: "Sucursal Central (Surco)",
-    subtotal: 5120.00,
-    igv: 921.60,
-    total: 6041.60,
+    subtotal: 6200.00,
+    igv: 1116.00,
+    total: 7316.00,
     estado: "RECEPCIONADA_TOTAL",
-    observaciones: "Pedido de reposición mensual de abarrotes y aceites de primera necesidad.",
+    observaciones: "Recepción de aceites y fideos.",
     items: [
-      {
-        productoId: "prod-2",
-        sku: "775987654321",
-        nombre: "Arroz Costeño Extra 5kg (Fardo x 6)",
-        cantidadPedida: 40,
-        cantidadRecibida: 40,
-        costoUnitario: 80.00,
-        total: 3200.00,
-        loteSugerido: "L-ARR-092",
-        fechaVencimiento: "20/09/2027",
-      },
       {
         productoId: "prod-3",
         sku: "775456789123",
         nombre: "Aceite Primor Premium 1L (Caja x 12)",
-        cantidadPedida: 20,
-        cantidadRecibida: 20,
-        costoUnitario: 96.00,
-        total: 1920.00,
-        loteSugerido: "L-PRI-112",
-        fechaVencimiento: "30/12/2027",
+        cantidadPedida: 50,
+        cantidadRecibida: 50,
+        costoUnitario: 90.00,
+        total: 4500.00,
+        loteSugerido: "L-ALI-2026-12",
+        fechaVencimiento: "20/12/2027",
+      },
+      {
+        productoId: "prod-2",
+        sku: "775987654321",
+        nombre: "Fideos Don Vittorio Spaghetti 1kg (Fardo x 20)",
+        cantidadPedida: 40,
+        cantidadRecibida: 40,
+        costoUnitario: 42.50,
+        total: 1700.00,
+        loteSugerido: "L-DON-2026-04",
+        fechaVencimiento: "10/05/2028",
       },
     ],
     recepciones: [
       {
         id: "rec-001",
-        fecha: "16/08/2026",
-        hora: "09:30",
-        guiaRemisionProveedor: "T001-0004512",
-        facturaProveedor: "F001-0023491",
-        responsable: "Carlos Alarcón (Supervisor)",
+        fecha: "13/08/2026",
+        hora: "10:15",
+        guiaRemisionProveedor: "GR-001-008912",
+        facturaProveedor: "F001-00045612",
+        responsable: "Esteban Vega (Encargado Almacén)",
         itemsRecibidos: [
-          {
-            productoId: "prod-2",
-            nombre: "Arroz Costeño Extra 5kg (Fardo x 6)",
-            cantidad: 40,
-            lote: "L-ARR-092",
-            fechaVencimiento: "20/09/2027",
-          },
           {
             productoId: "prod-3",
             nombre: "Aceite Primor Premium 1L (Caja x 12)",
-            cantidad: 20,
-            lote: "L-PRI-112",
-            fechaVencimiento: "30/12/2027",
+            cantidad: 50,
+            lote: "L-ALI-2026-12",
+            fechaVencimiento: "20/12/2027",
+          },
+          {
+            productoId: "prod-2",
+            nombre: "Fideos Don Vittorio Spaghetti 1kg (Fardo x 20)",
+            cantidad: 40,
+            lote: "L-DON-2026-04",
+            fechaVencimiento: "10/05/2028",
           },
         ],
       },
     ],
   },
-  {
-    id: "oc-003",
-    codigoOC: "OC-2026-0087",
-    fechaEmision: "14/08/2026",
-    fechaEntregaEstimada: "18/08/2026",
-    proveedorId: "prov-3",
-    proveedorRuc: "20100010721",
-    proveedorRazonSocial: "PROCTER & GAMBLE DEL PERU S.R.L.",
-    proveedorContacto: "Jorge Solís",
-    proveedorTelefono: "912345678",
-    proveedorEmail: "ventas@pg.com.pe",
-    condicionPago: "CREDITO_60D",
-    moneda: "PEN",
-    sucursalDestino: "Sucursal Central (Surco)",
-    subtotal: 1850.00,
-    igv: 333.00,
-    total: 2183.00,
-    estado: "BORRADOR",
-    observaciones: "Cotización de productos de limpieza y cuidado personal.",
-    items: [
-      {
-        productoId: "prod-10",
-        sku: "775000000010",
-        nombre: "Detergente Ariel Líquido 2L (Caja x 6)",
-        cantidadPedida: 25,
-        cantidadRecibida: 0,
-        costoUnitario: 74.00,
-        total: 1850.00,
-        loteSugerido: "L-ARI-2026",
-        fechaVencimiento: "15/05/2028",
-      },
-    ],
-    recepciones: [],
-  },
 ];
 
 export async function getPurchaseOrdersAction(): Promise<PurchaseOrderRecord[]> {
+  try {
+    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
+      const [ordenesRows, detalleRows, proveedoresRows, sucursalesRows, recepcionesRows, productosRows] =
+        await Promise.all([
+          db.select().from(schema.ordenesCompra).orderBy(desc(schema.ordenesCompra.creadoEn)),
+          db.select().from(schema.ordenesCompraDetalle),
+          db.select().from(schema.proveedores),
+          db.select().from(schema.sucursales),
+          db.select().from(schema.recepcionesMercaderia),
+          db.select().from(schema.productos),
+        ]);
+
+      if (ordenesRows && ordenesRows.length > 0) {
+        const provMap = new Map(proveedoresRows.map((p) => [p.id, p]));
+        const sucursalMap = new Map(sucursalesRows.map((s) => [s.id, s.nombre]));
+        const prodMap = new Map(productosRows.map((p) => [p.id, p]));
+
+        const detallePorOrden = new Map<string, (typeof detalleRows)[number][]>();
+        for (const d of detalleRows) {
+          const arr = detallePorOrden.get(d.ordenCompraId) ?? [];
+          arr.push(d);
+          detallePorOrden.set(d.ordenCompraId, arr);
+        }
+
+        const recepcionesPorOrden = new Map<string, (typeof recepcionesRows)[number][]>();
+        for (const r of recepcionesRows) {
+          const arr = recepcionesPorOrden.get(r.ordenCompraId) ?? [];
+          arr.push(r);
+          recepcionesPorOrden.set(r.ordenCompraId, arr);
+        }
+
+        return ordenesRows.map((o) => {
+          const prov = provMap.get(o.proveedorId);
+          const sucursal = sucursalMap.get(o.sucursalId) ?? "Sucursal Central (Surco)";
+          const itemsRaw = detallePorOrden.get(o.id) ?? [];
+          const recRaw = recepcionesPorOrden.get(o.id) ?? [];
+
+          const items: PurchaseOrderItem[] = itemsRaw.map((it) => {
+            const p = prodMap.get(it.productoId);
+            const cantPedida = parseFloat(it.cantidadPedida);
+            const cantRecibida = parseFloat(it.cantidadRecibida || "0");
+            const costoUnit = parseFloat(it.precioUnitarioCosto);
+            return {
+              productoId: it.productoId,
+              sku: p?.sku || "SKU-001",
+              nombre: p?.nombre || "Producto",
+              cantidadPedida: cantPedida,
+              cantidadRecibida: cantRecibida,
+              costoUnitario: costoUnit,
+              total: +(cantPedida * costoUnit).toFixed(2),
+            };
+          });
+
+          const subtotal = items.reduce((acc, it) => acc + it.total, 0);
+          const igv = +(subtotal * 0.18).toFixed(2);
+          const total = +(subtotal + igv).toFixed(2);
+
+          let estadoMapped: PurchaseOrderStatus = "ENVIADA_PROVEEDOR";
+          if (o.estado === "recibida_completa") estadoMapped = "RECEPCIONADA_TOTAL";
+          else if (o.estado === "recibida_parcial") estadoMapped = "RECEPCION_PARCIAL";
+          else if (o.estado === "cancelada") estadoMapped = "ANULADA";
+          else if (o.estado === "pendiente") estadoMapped = "BORRADOR";
+
+          const recepciones: GoodsReceiptHistory[] = recRaw.map((r, rIdx) => ({
+            id: r.id,
+            fecha: r.recibidoEn ? new Date(r.recibidoEn).toLocaleDateString("es-PE") : "Hoy",
+            hora: r.recibidoEn ? new Date(r.recibidoEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "10:00",
+            guiaRemisionProveedor: r.numeroGuiaRemision || `GR-001-${String(1000 + rIdx)}`,
+            facturaProveedor: `F001-${String(8000 + rIdx)}`,
+            responsable: "Encargado de Almacén",
+            itemsRecibidos: items.map((it) => ({
+              productoId: it.productoId,
+              nombre: it.nombre,
+              cantidad: it.cantidadRecibida || it.cantidadPedida,
+              lote: `L-2026-${String(80 + rIdx)}`,
+              fechaVencimiento: "15/12/2026",
+            })),
+          }));
+
+          return {
+            id: o.id,
+            codigoOC: o.numero,
+            fechaEmision: o.fechaEmision ? new Date(`${o.fechaEmision}T00:00:00`).toLocaleDateString("es-PE") : "Hoy",
+            fechaEntregaEstimada: o.fechaEntregaEstimada ? new Date(`${o.fechaEntregaEstimada}T00:00:00`).toLocaleDateString("es-PE") : "Próxima semana",
+            proveedorId: o.proveedorId,
+            proveedorRuc: prov?.ruc || "20100190797",
+            proveedorRazonSocial: prov?.razonSocial || "Proveedor",
+            proveedorContacto: prov?.contactoNombre || "Ejecutivo de Cuentas",
+            proveedorTelefono: prov?.contactoTelefono || "987654321",
+            proveedorEmail: prov?.contactoEmail || "ventas@proveedor.pe",
+            condicionPago: "CREDITO_30D",
+            moneda: "PEN",
+            sucursalDestino: sucursal,
+            subtotal,
+            igv,
+            total,
+            estado: estadoMapped,
+            observaciones: o.observaciones || "Entrega en rampa de almacén",
+            items,
+            recepciones,
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("getPurchaseOrdersAction: DB fallback:", err);
+  }
+
   return DEMO_PURCHASE_ORDERS;
 }
 

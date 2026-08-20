@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Truck,
   ArrowRightLeft,
@@ -21,6 +21,7 @@ import {
   Calendar,
   AlertCircle,
   Eye,
+  RefreshCw,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -29,56 +30,10 @@ import { GreTicketDialog } from "@/components/inventario/gre-ticket-dialog";
 import {
   createStockTransferAction,
   receiveStockTransferAction,
+  getStockTransfersAction,
   TransferRecord,
   CreateTransferInput,
 } from "@/actions/transfer-actions";
-
-const DEMO_TRANSFERS: TransferRecord[] = [
-  {
-    id: "trans-1",
-    codigoGuia: "T001-00000012",
-    sucursalOrigen: "Almacén Central (Surco)",
-    sucursalDestino: "Sucursal Miraflores",
-    estado: "en_transito",
-    fechaSalida: "17/08/2026",
-    horaSalida: "08:30",
-    pesoBrutoKgm: 185.40,
-    totalBultos: 4,
-    modalidadTransporte: "02",
-    choferNombre: "Jorge Huamán Díaz",
-    vehiculoPlaca: "ABC-123 (Isuzu)",
-    hashSunat: "q7E4u9Yx1P3a8B2=",
-    qrString: "20608945123|09|T001|00000012|20608945123|2026-08-17|q7E4u9Yx1P3a8B2=|",
-    items: [
-      { productoId: "1", sku: "775012345678", nombre: "Leche Gloria Entera 400g", cantidad: 120, unidadMedida: "und" },
-      { productoId: "2", sku: "775098765432", nombre: "Arroz Costeño Extra 1kg", cantidad: 60, unidadMedida: "und" },
-      { productoId: "3", sku: "775011122233", nombre: "Aceite Primor Premium 1L", cantidad: 45, unidadMedida: "und" },
-      { productoId: "4", sku: "200000012345", nombre: "Manzana Delicia Nacional (kg)", cantidad: 25, unidadMedida: "kg" },
-    ],
-  },
-  {
-    id: "trans-2",
-    codigoGuia: "T001-00000011",
-    sucursalOrigen: "Almacén Central (Surco)",
-    sucursalDestino: "Sucursal San Isidro",
-    estado: "completada",
-    fechaSalida: "16/08/2026",
-    horaSalida: "14:15",
-    fechaLlegada: "16/08/2026 16:40",
-    pesoBrutoKgm: 94.20,
-    totalBultos: 2,
-    modalidadTransporte: "02",
-    choferNombre: "Mario Vargas Peña",
-    vehiculoPlaca: "XYZ-789 (Hino)",
-    hashSunat: "m2K8v4Lz0N9b3C1=",
-    qrString: "20608945123|09|T001|00000011|20608945123|2026-08-16|m2K8v4Lz0N9b3C1=|",
-    items: [
-      { productoId: "5", sku: "775055566677", nombre: "Detergente Bolívar 1kg", cantidad: 50, unidadMedida: "und" },
-      { productoId: "6", sku: "775033344455", nombre: "Jabón de Tocador Camay", cantidad: 80, unidadMedida: "und" },
-    ],
-  },
-];
-
 const AVAILABLE_PRODUCTS = [
   { id: "1", sku: "775012345678", nombre: "Leche Gloria Entera 400g", stock: 240, unidad: "und", peso: 0.45 },
   { id: "2", sku: "775098765432", nombre: "Arroz Costeño Extra 1kg", stock: 180, unidad: "und", peso: 1.00 },
@@ -90,7 +45,25 @@ const AVAILABLE_PRODUCTS = [
 import { useQueryState, parseAsString } from "nuqs";
 
 export default function TransferenciasPage() {
-  const [transfers, setTransfers] = useState<TransferRecord[]>(DEMO_TRANSFERS);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getStockTransfersAction();
+      setTransfers(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
   const [filterStatus, setFilterStatus] = useQueryState<"all" | "en_transito" | "completada">(
     "estado",

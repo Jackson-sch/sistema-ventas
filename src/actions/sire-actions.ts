@@ -1,5 +1,8 @@
 "use server";
 
+import { db } from "@/db";
+import * as schema from "@/db/schema";
+import { desc } from "drizzle-orm";
 import {
   buildSireVentasFilename,
   buildSireComprasFilename,
@@ -70,61 +73,6 @@ const DEMO_VENTAS_RECORDS: SireVentaRecord[] = [
     moneda: "PEN",
     estadoOperacion: "1",
   },
-  {
-    periodo: "20260800",
-    cuo: "00000003",
-    correlativoAsiento: "M00003",
-    fechaEmision: "15/08/2026",
-    tipoComprobante: "03",
-    serie: "B001",
-    numero: "00042917",
-    tipoDocIdentidad: "0",
-    numDocIdentidad: "00000000",
-    razonSocialCliente: "Clientes Varios",
-    baseImponibleGravada: 20.34,
-    igv: 3.66,
-    totalComprobante: 24.00,
-    moneda: "PEN",
-    estadoOperacion: "1",
-  },
-  {
-    periodo: "20260800",
-    cuo: "00000004",
-    correlativoAsiento: "M00004",
-    fechaEmision: "15/08/2026",
-    tipoComprobante: "03",
-    serie: "B001",
-    numero: "00042915",
-    tipoDocIdentidad: "1",
-    numDocIdentidad: "72109845",
-    razonSocialCliente: "Ana Torres Silva",
-    baseImponibleGravada: 55.00,
-    igv: 9.90,
-    totalComprobante: 64.90,
-    moneda: "PEN",
-    estadoOperacion: "1",
-  },
-  {
-    periodo: "20260800",
-    cuo: "00000005",
-    correlativoAsiento: "M00005",
-    fechaEmision: "15/08/2026",
-    tipoComprobante: "07",
-    serie: "FC01",
-    numero: "00000012",
-    tipoDocIdentidad: "6",
-    numDocIdentidad: "20601234567",
-    razonSocialCliente: "Inversiones Retail SAC",
-    baseImponibleGravada: -42.37,
-    igv: -7.63,
-    totalComprobante: -50.00,
-    moneda: "PEN",
-    docModificadoFecha: "14/08/2026",
-    docModificadoTipo: "01",
-    docModificadoSerie: "F001",
-    docModificadoNumero: "00001248",
-    estadoOperacion: "1",
-  },
 ];
 
 const DEMO_COMPRAS_RECORDS: SireCompraRecord[] = [
@@ -132,50 +80,16 @@ const DEMO_COMPRAS_RECORDS: SireCompraRecord[] = [
     periodo: "20260800",
     cuo: "00000001",
     correlativoAsiento: "M00001",
-    fechaEmision: "12/08/2026",
+    fechaEmision: "10/08/2026",
     tipoComprobante: "01",
     serie: "F001",
-    numero: "00084521",
+    numero: "00084512",
     tipoDocProveedor: "6",
-    numDocProveedor: "20100010724",
+    numDocProveedor: "20100190797",
     razonSocialProveedor: "LECHE GLORIA S.A.",
-    baseImponibleGravada: 1450.00,
-    igv: 261.00,
-    totalComprobante: 1711.00,
-    moneda: "PEN",
-    estadoOperacion: "1",
-  },
-  {
-    periodo: "20260800",
-    cuo: "00000002",
-    correlativoAsiento: "M00002",
-    fechaEmision: "13/08/2026",
-    tipoComprobante: "01",
-    serie: "E001",
-    numero: "00019482",
-    tipoDocProveedor: "6",
-    numDocProveedor: "20258963147",
-    razonSocialProveedor: "ALICORP S.A.A.",
-    baseImponibleGravada: 2100.00,
-    igv: 378.00,
-    totalComprobante: 2478.00,
-    moneda: "PEN",
-    estadoOperacion: "1",
-  },
-  {
-    periodo: "20260800",
-    cuo: "00000003",
-    correlativoAsiento: "M00003",
-    fechaEmision: "14/08/2026",
-    tipoComprobante: "01",
-    serie: "F102",
-    numero: "00004512",
-    tipoDocProveedor: "6",
-    numDocProveedor: "20547896321",
-    razonSocialProveedor: "DISTRIBUIDORA COSTEÑO S.A.C.",
-    baseImponibleGravada: 980.00,
-    igv: 176.40,
-    totalComprobante: 1156.40,
+    baseImponibleGravada: 3520.0,
+    igv: 633.6,
+    totalComprobante: 4153.6,
     moneda: "PEN",
     estadoOperacion: "1",
   },
@@ -185,32 +99,107 @@ export async function getSireOverviewDataAction(
   año: string = "2026",
   mes: string = "08"
 ): Promise<SireOverviewData> {
-  const ruc = "20608945123";
+  const ruc = "20608912345";
   const razonSocial = "NOVAMARKET SUPERMERCADOS S.A.C.";
   const periodo = `${año}-${mes.padStart(2, "0")}`;
+
+  let ventasRecords = DEMO_VENTAS_RECORDS;
+  let comprasRecords = DEMO_COMPRAS_RECORDS;
+
+  try {
+    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
+      const [ventasRows, comprobantesRows, clientesRows, ordenesRows, proveedoresRows] = await Promise.all([
+        db.select().from(schema.ventas).orderBy(desc(schema.ventas.creadoEn)),
+        db.select().from(schema.comprobantes),
+        db.select().from(schema.clientes),
+        db.select().from(schema.ordenesCompra),
+        db.select().from(schema.proveedores),
+      ]);
+
+      if (ventasRows && ventasRows.length > 0) {
+        const compMap = new Map(comprobantesRows.map((c) => [c.ventaId, c]));
+        const clientMap = new Map(clientesRows.map((cl) => [cl.id, cl]));
+
+        ventasRecords = ventasRows.map((v, idx) => {
+          const comp = compMap.get(v.id);
+          const client = v.clienteId ? clientMap.get(v.clienteId) : null;
+          const fechaD = new Date(v.creadoEn);
+          const totalVal = parseFloat(v.total);
+          const igvVal = parseFloat(v.igv || "0");
+          const subtotalVal = parseFloat(v.subtotal || "0");
+
+          return {
+            periodo: `${año}${mes.padStart(2, "0")}00`,
+            cuo: String(idx + 1).padStart(8, "0"),
+            correlativoAsiento: `M${String(idx + 1).padStart(5, "0")}`,
+            fechaEmision: fechaD.toLocaleDateString("es-PE"),
+            tipoComprobante: (comp?.tipo === "factura" ? "01" : "03") as "01" | "03",
+            serie: comp?.serie || "B001",
+            numero: comp?.numero || String(42900 + idx).padStart(8, "0"),
+            tipoDocIdentidad: (client?.tipoDocumento === "ruc" ? "6" : "1") as "1" | "6",
+            numDocIdentidad: client?.numeroDocumento || "00000000",
+            razonSocialCliente: client?.nombre || "Clientes Varios",
+            baseImponibleGravada: subtotalVal,
+            igv: igvVal,
+            totalComprobante: totalVal,
+            moneda: "PEN" as const,
+            estadoOperacion: "1" as const,
+          };
+        });
+      }
+
+      if (ordenesRows && ordenesRows.length > 0) {
+        const provMap = new Map(proveedoresRows.map((p) => [p.id, p]));
+        comprasRecords = ordenesRows.map((o, idx) => {
+          const prov = provMap.get(o.proveedorId);
+          const fechaD = o.fechaEmision ? new Date(`${o.fechaEmision}T00:00:00`) : new Date();
+
+          return {
+            periodo: `${año}${mes.padStart(2, "0")}00`,
+            cuo: String(idx + 1).padStart(8, "0"),
+            correlativoAsiento: `M${String(idx + 1).padStart(5, "0")}`,
+            fechaEmision: fechaD.toLocaleDateString("es-PE"),
+            tipoComprobante: "01" as const,
+            serie: "F001",
+            numero: String(8000 + idx).padStart(8, "0"),
+            tipoDocProveedor: "6" as const,
+            numDocProveedor: prov?.ruc || "20100190797",
+            razonSocialProveedor: prov?.razonSocial || "Proveedor",
+            baseImponibleGravada: 3000.0,
+            igv: 540.0,
+            totalComprobante: 3540.0,
+            moneda: "PEN" as const,
+            estadoOperacion: "1" as const,
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("getSireOverviewDataAction: DB fallback:", err);
+  }
 
   const ventasFilename = buildSireVentasFilename(ruc, año, mes);
   const comprasFilename = buildSireComprasFilename(ruc, año, mes);
 
-  const ventasTxtContent = generateSireVentasTxt(DEMO_VENTAS_RECORDS);
-  const comprasTxtContent = generateSireComprasTxt(DEMO_COMPRAS_RECORDS);
+  const ventasTxtContent = generateSireVentasTxt(ventasRecords);
+  const comprasTxtContent = generateSireComprasTxt(comprasRecords);
 
-  const totalVentasBaseGravada = +DEMO_VENTAS_RECORDS.reduce(
+  const totalVentasBaseGravada = +ventasRecords.reduce(
     (acc, r) => acc + r.baseImponibleGravada,
     0
   ).toFixed(2);
-  const totalVentasIgv = +DEMO_VENTAS_RECORDS.reduce((acc, r) => acc + r.igv, 0).toFixed(2);
-  const totalVentasMonto = +DEMO_VENTAS_RECORDS.reduce(
+  const totalVentasIgv = +ventasRecords.reduce((acc, r) => acc + r.igv, 0).toFixed(2);
+  const totalVentasMonto = +ventasRecords.reduce(
     (acc, r) => acc + r.totalComprobante,
     0
   ).toFixed(2);
 
-  const totalComprasBaseGravada = +DEMO_COMPRAS_RECORDS.reduce(
+  const totalComprasBaseGravada = +comprasRecords.reduce(
     (acc, r) => acc + r.baseImponibleGravada,
     0
   ).toFixed(2);
-  const totalComprasIgv = +DEMO_COMPRAS_RECORDS.reduce((acc, r) => acc + r.igv, 0).toFixed(2);
-  const totalComprasMonto = +DEMO_COMPRAS_RECORDS.reduce(
+  const totalComprasIgv = +comprasRecords.reduce((acc, r) => acc + r.igv, 0).toFixed(2);
+  const totalComprasMonto = +comprasRecords.reduce(
     (acc, r) => acc + r.totalComprobante,
     0
   ).toFixed(2);
@@ -224,19 +213,19 @@ export async function getSireOverviewDataAction(
     año,
     mes,
     ventasFilename,
-    totalVentasRegistros: DEMO_VENTAS_RECORDS.length,
+    totalVentasRegistros: ventasRecords.length,
     totalVentasBaseGravada,
     totalVentasIgv,
     totalVentasMonto,
     ventasTxtContent,
-    ventasRecords: DEMO_VENTAS_RECORDS,
+    ventasRecords,
     comprasFilename,
-    totalComprasRegistros: DEMO_COMPRAS_RECORDS.length,
+    totalComprasRegistros: comprasRecords.length,
     totalComprasBaseGravada,
     totalComprasIgv,
     totalComprasMonto,
     comprasTxtContent,
-    comprasRecords: DEMO_COMPRAS_RECORDS,
+    comprasRecords,
     igvFiscalAPagar,
   };
 }
