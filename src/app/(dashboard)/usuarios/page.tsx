@@ -26,7 +26,6 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { UserFormDialog, UserData } from "@/components/usuarios/user-form-dialog";
-import { RolePermissionsDialog } from "@/components/usuarios/role-permissions-dialog";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { getUsersAndRolesData } from "@/actions/data-fetchers";
@@ -43,10 +42,6 @@ export default function UsuariosPage() {
   // User form modal
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
-
-  // Permissions modal
-  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
-  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<string | null>(null);
 
   // Delete modal
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -137,9 +132,11 @@ export default function UsuariosPage() {
     setUserToDelete(null);
   };
 
-  const handleOpenPermissions = (rol: string) => {
-    setSelectedRoleForPermissions(rol);
-    setIsPermissionsOpen(true);
+  const getRoleParam = (rol: string) => {
+    if (rol.includes("Cajero")) return "cajero";
+    if (rol.includes("Supervisor")) return "supervisor";
+    if (rol.includes("Almacén") || rol.includes("Almacen")) return "almacen";
+    return "admin";
   };
 
   return (
@@ -363,24 +360,24 @@ export default function UsuariosPage() {
                 </td>
                 <td className="py-3.5 px-4 text-center">
                   <div className="flex items-center justify-center gap-1.5">
-                    <button
-                      onClick={() => handleOpenPermissions(user.rol)}
-                      title="Ver/Editar Permisos RBAC"
-                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-purple-600 text-slate-300 hover:text-white transition-colors"
+                    <Link
+                      href={`/usuarios/permisos?rol=${getRoleParam(user.rol)}&view=detail`}
+                      title="Ver/Configurar Permisos RBAC de este Rol"
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     >
                       <Shield className="size-3.5" />
-                    </button>
+                    </Link>
                     <button
                       onClick={() => handleOpenEditUser(user)}
                       title="Editar Colaborador"
-                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     >
                       <Edit2 className="size-3.5" />
                     </button>
                     <button
                       onClick={() => handleRequestDelete(user.id, user.nombre)}
                       title="Eliminar Colaborador"
-                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -407,13 +404,6 @@ export default function UsuariosPage() {
         onClose={() => setIsUserFormOpen(false)}
         onSave={handleSaveUser}
         userToEdit={editingUser}
-      />
-
-      {/* Role Permissions Dialog */}
-      <RolePermissionsDialog
-        isOpen={isPermissionsOpen}
-        onClose={() => setIsPermissionsOpen(false)}
-        roleName={selectedRoleForPermissions || "Cajero POS"}
       />
 
       {/* Secure Delete Confirmation Dialog */}

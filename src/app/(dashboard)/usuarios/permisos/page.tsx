@@ -30,6 +30,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryState, parseAsString } from "nuqs";
 import {
   getRolePermissionsMatrixAction,
   saveAllPermissionsMatrixAction,
@@ -46,10 +47,21 @@ export default function PermisosPage() {
   const [matrix, setMatrix] = useState<Record<string, Record<string, boolean>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<"matrix" | "detail">("matrix");
-  const [activeRoleTab, setActiveRoleTab] = useState("supervisor");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRiskFilter, setSelectedRiskFilter] = useState<"all" | RiskLevel>("all");
+
+  // nuqs query state for deep-linking
+  const [viewMode, setViewMode] = useQueryState<"matrix" | "detail">(
+    "view",
+    parseAsString.withDefault("matrix") as any
+  );
+  const [activeRoleTab, setActiveRoleTab] = useQueryState<string>(
+    "rol",
+    parseAsString.withDefault("supervisor")
+  );
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  const [selectedRiskFilter, setSelectedRiskFilter] = useQueryState<"all" | RiskLevel>(
+    "riesgo",
+    parseAsString.withDefault("all") as any
+  );
 
   const loadData = async () => {
     setIsLoading(true);
@@ -195,7 +207,7 @@ export default function PermisosPage() {
           <div className="flex items-center gap-2 mb-1.5">
             <Link
               href="/usuarios"
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 transition-colors"
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 transition-colors cursor-pointer"
             >
               <ArrowLeft className="size-3.5" /> Volver a Colaboradores
             </Link>
