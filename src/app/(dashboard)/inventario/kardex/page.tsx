@@ -63,139 +63,12 @@ const PRODUCTS_LIST = [
   { id: "5", name: "Detergente Bolívar 1kg (775678912345)" },
 ];
 
-const INITIAL_KARDEX_DATA: KardexRecord[] = [
-  {
-    id: "1",
-    fecha: "15/08/2026 11:42",
-    productoId: "1",
-    productoNombre: "Leche Gloria Entera 400g",
-    sku: "775123456789",
-    categoria: "Lácteos",
-    tipoOperacion: "01_VENTA",
-    operacionLabel: "Venta en Caja 01 (POS)",
-    tipoDoc: "03_BOLETA",
-    docSerieNumero: "B001-00042918",
-    salidaCant: 2,
-    salidaCostoUnit: 3.40,
-    salidaTotal: 6.80,
-    saldoCant: 142,
-    saldoCostoUnit: 3.40,
-    saldoTotal: 482.80,
-  },
-  {
-    id: "2",
-    fecha: "15/08/2026 11:35",
-    productoId: "2",
-    productoNombre: "Arroz Costeño Extra 1kg",
-    sku: "775987654321",
-    categoria: "Abarrotes",
-    tipoOperacion: "01_VENTA",
-    operacionLabel: "Venta en Caja 01 (POS)",
-    tipoDoc: "03_BOLETA",
-    docSerieNumero: "B001-00042917",
-    salidaCant: 1,
-    salidaCostoUnit: 4.10,
-    salidaTotal: 4.10,
-    saldoCant: 18,
-    saldoCostoUnit: 4.10,
-    saldoTotal: 73.80,
-  },
-  {
-    id: "3",
-    fecha: "15/08/2026 11:15",
-    productoId: "3",
-    productoNombre: "Aceite Primor Premium 1L",
-    sku: "775456789123",
-    categoria: "Abarrotes",
-    tipoOperacion: "01_VENTA",
-    operacionLabel: "Venta en Caja 02",
-    tipoDoc: "01_FACTURA",
-    docSerieNumero: "F001-00001204",
-    salidaCant: 5,
-    salidaCostoUnit: 7.90,
-    salidaTotal: 39.50,
-    saldoCant: 64,
-    saldoCostoUnit: 7.90,
-    saldoTotal: 505.60,
-  },
-  {
-    id: "4",
-    fecha: "15/08/2026 10:30",
-    productoId: "1",
-    productoNombre: "Leche Gloria Entera 400g",
-    sku: "775123456789",
-    categoria: "Lácteos",
-    tipoOperacion: "01_VENTA",
-    operacionLabel: "Venta en Caja 03 Autoservicio",
-    tipoDoc: "03_BOLETA",
-    docSerieNumero: "B001-00042914",
-    salidaCant: 4,
-    salidaCostoUnit: 3.40,
-    salidaTotal: 13.60,
-    saldoCant: 144,
-    saldoCostoUnit: 3.40,
-    saldoTotal: 489.60,
-  },
-  {
-    id: "5",
-    fecha: "14/08/2026 16:15",
-    productoId: "1",
-    productoNombre: "Leche Gloria Entera 400g",
-    sku: "775123456789",
-    categoria: "Lácteos",
-    tipoOperacion: "13_MERMA",
-    operacionLabel: "Merma por lata golpeada/abollada",
-    tipoDoc: "AJ_ACTA",
-    docSerieNumero: "MERMA-2026-089",
-    salidaCant: 1,
-    salidaCostoUnit: 3.40,
-    salidaTotal: 3.40,
-    saldoCant: 148,
-    saldoCostoUnit: 3.40,
-    saldoTotal: 503.20,
-  },
-  {
-    id: "6",
-    fecha: "12/08/2026 09:00",
-    productoId: "1",
-    productoNombre: "Leche Gloria Entera 400g",
-    sku: "775123456789",
-    categoria: "Lácteos",
-    tipoOperacion: "02_COMPRA",
-    operacionLabel: "Recepción de Proveedor Gloria SA (OC #442)",
-    tipoDoc: "01_FACTURA",
-    docSerieNumero: "F001-008921",
-    entradaCant: 100,
-    entradaCostoUnit: 3.40,
-    entradaTotal: 340.00,
-    saldoCant: 149,
-    saldoCostoUnit: 3.40,
-    saldoTotal: 506.60,
-  },
-  {
-    id: "7",
-    fecha: "10/08/2026 08:00",
-    productoId: "5",
-    productoNombre: "Detergente Bolívar 1kg",
-    sku: "775678912345",
-    categoria: "Limpieza",
-    tipoOperacion: "02_COMPRA",
-    operacionLabel: "Recepción de Proveedor Alicorp (OC #438)",
-    tipoDoc: "01_FACTURA",
-    docSerieNumero: "F001-003319",
-    entradaCant: 50,
-    entradaCostoUnit: 6.80,
-    entradaTotal: 340.00,
-    saldoCant: 45,
-    saldoCostoUnit: 6.80,
-    saldoTotal: 306.00,
-  },
-];
-
 import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 
 export default function KardexPage() {
-  const [kardexRecords, setKardexRecords] = useState<KardexRecord[]>(INITIAL_KARDEX_DATA);
+  const [kardexRecords, setKardexRecords] = useState<KardexRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedProduct, setSelectedProduct] = useQueryState("prod", parseAsString.withDefault("all"));
   const [selectedOperation, setSelectedOperation] = useQueryState("op", parseAsString.withDefault("all"));
   const [valuationMethod, setValuationMethod] = useQueryState("metodo", parseAsString.withDefault("ponderado"));
@@ -214,17 +87,26 @@ export default function KardexPage() {
   const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
 
-  useEffect(() => {
-    async function loadKardex() {
-      try {
-        const data = await getKardexMovementsData();
-        if (data && data.length > 0) {
-          setKardexRecords(data);
+  const loadKardex = async (showToast = false) => {
+    try {
+      if (showToast) setIsRefreshing(true);
+      const data = await getKardexMovementsData();
+      if (data) {
+        setKardexRecords(data);
+        if (showToast) {
+          toast.success(`Kardex actualizado: ${data.length} movimientos de inventario sincronizados.`);
         }
-      } catch (err) {
-        console.error("Error fetching kardex movements:", err);
       }
+    } catch (err) {
+      console.error("Error fetching kardex movements:", err);
+      if (showToast) toast.error("Error al actualizar kardex.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  useEffect(() => {
     loadKardex();
   }, []);
 
@@ -320,6 +202,15 @@ export default function KardexPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => loadKardex(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50"
+            title="Sincronizar movimientos de Kardex desde la Base de Datos"
+          >
+            <RefreshCw className={`size-3.5 text-blue-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
           <Link
             href="/inventario"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors"

@@ -53,87 +53,6 @@ interface ProductLabelItem {
   badgePromo?: string;
 }
 
-const INITIAL_PRODUCTS: ProductLabelItem[] = [
-  {
-    id: "1",
-    sku: "GLO-001",
-    nombre: "Leche Gloria Entera 400g",
-    categoria: "Lácteos",
-    marca: "Gloria",
-    precioVenta: 4.50,
-    precioAnterior: 4.90,
-    unidad: "und",
-    copias: 2,
-    barcode: "775123456789",
-    selected: true,
-    badgePromo: "OFERTA",
-  },
-  {
-    id: "2",
-    sku: "COS-001",
-    nombre: "Arroz Costeño Extra 1kg",
-    categoria: "Abarrotes",
-    marca: "Costeño",
-    precioVenta: 5.20,
-    unidad: "und",
-    copias: 2,
-    barcode: "775987654321",
-    selected: true,
-  },
-  {
-    id: "3",
-    sku: "PRI-001",
-    nombre: "Aceite Primor Premium 1L",
-    categoria: "Abarrotes",
-    marca: "Primor",
-    precioVenta: 9.80,
-    precioAnterior: 10.50,
-    unidad: "und",
-    copias: 1,
-    barcode: "775456789123",
-    selected: true,
-    badgePromo: "PRECIO CLUB",
-  },
-  {
-    id: "4",
-    sku: "MAN-001",
-    nombre: "Manzana Delicia Nacional (kg)",
-    categoria: "Frutas & Verduras",
-    marca: "Granja Fresca",
-    precioVenta: 4.80,
-    unidad: "kg",
-    copias: 3,
-    barcode: "200000012345",
-    selected: true,
-  },
-  {
-    id: "5",
-    sku: "BOL-001",
-    nombre: "Detergente Bolívar Floral 1kg",
-    categoria: "Limpieza",
-    marca: "Bolívar",
-    precioVenta: 8.50,
-    precioAnterior: 9.20,
-    unidad: "und",
-    copias: 2,
-    barcode: "775678912345",
-    selected: true,
-    badgePromo: "BAJÓ DE PRECIO",
-  },
-  {
-    id: "6",
-    sku: "YOG-001",
-    nombre: "Yogurt Gloria Fresa 1L",
-    categoria: "Lácteos",
-    marca: "Gloria",
-    precioVenta: 7.20,
-    unidad: "und",
-    copias: 1,
-    barcode: "775889900112",
-    selected: false,
-  },
-];
-
 type LabelFormat = "gondola_70x40" | "gondola_50x30" | "adhesiva_38x25" | "hoja_a4_24";
 
 // ── Real Standard Code-128B Barcode Patterns ─────────────────────────
@@ -243,7 +162,8 @@ function generateCode128SvgString(code: string): string {
 }
 
 export default function EtiquetasPage() {
-  const [products, setProducts] = useState<ProductLabelItem[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<ProductLabelItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [labelFormat, setLabelFormat] = useState<LabelFormat>("gondola_70x40");

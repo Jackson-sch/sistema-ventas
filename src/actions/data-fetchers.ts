@@ -659,6 +659,71 @@ export async function getSuppliersData() {
   ];
 }
 
+// 5.1 COMPRAS & RECEPCIONES DE FACTURAS DE PROVEEDOR
+export async function getPurchasesData() {
+  try {
+    if (hasDb()) {
+      const [ordenesRows, proveedoresRows, detalleRows, productosRows] = await Promise.all([
+        db.select().from(schema.ordenesCompra).orderBy(desc(schema.ordenesCompra.creadoEn)),
+        db.select().from(schema.proveedores),
+        db.select().from(schema.ordenesCompraDetalle),
+        db.select().from(schema.productos),
+      ]);
+
+      if (ordenesRows && ordenesRows.length > 0) {
+        const provMap = new Map(proveedoresRows.map((p) => [p.id, p]));
+        const prodMap = new Map(productosRows.map((p) => [p.id, p]));
+        const detallePorOrden = new Map<string, typeof detalleRows>();
+        for (const d of detalleRows) {
+          const arr = detallePorOrden.get(d.ordenCompraId) ?? [];
+          arr.push(d);
+          detallePorOrden.set(d.ordenCompraId, arr);
+        }
+
+        return ordenesRows.map((o) => {
+          const prov = provMap.get(o.proveedorId);
+          const detalles = detallePorOrden.get(o.id) ?? [];
+          const subtotal = detalles.reduce(
+            (acc, d) => acc + parseFloat(d.cantidadPedida) * parseFloat(d.precioUnitarioCosto),
+            0
+          );
+          const igv = +(subtotal * 0.18).toFixed(2);
+          const total = +(subtotal + igv).toFixed(2);
+
+          return {
+            id: o.id,
+            numeroFactura: o.numero || `OC-2026-${o.id.slice(0, 6).toUpperCase()}`,
+            proveedorId: o.proveedorId,
+            proveedorNombre: prov?.razonSocial || "Proveedor General",
+            proveedorRuc: prov?.ruc || "20100000000",
+            fechaEmision: fmtFecha(new Date(o.creadoEn)),
+            fechaRecepcion: o.fechaEntregaEstimada || fmtFecha(new Date(o.creadoEn)),
+            subtotal,
+            igv,
+            total,
+            condicionPago: "Crédito 30 días" as const,
+            estado: (o.estado.startsWith("recibida") ? "Recibido" : o.estado === "pendiente" ? "Pendiente" : "En Tránsito") as "Recibido" | "Pendiente" | "En Tránsito",
+            items: detalles.map((d) => {
+              const prod = prodMap.get(d.productoId);
+              return {
+                productoId: d.productoId,
+                nombre: prod?.nombre || "Producto",
+                sku: prod?.sku || "SKU-000",
+                cantidad: parseFloat(d.cantidadPedida),
+                costoUnitario: parseFloat(d.precioUnitarioCosto),
+                total: +(parseFloat(d.cantidadPedida) * parseFloat(d.precioUnitarioCosto)).toFixed(2),
+              };
+            }),
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("getPurchasesData: DB fallback:", err);
+  }
+  return [];
+}
+
 // 6. MOVIMIENTOS KARDEX VALORADO (SUNAT 13.1)
 export async function getKardexMovementsData() {
   try {

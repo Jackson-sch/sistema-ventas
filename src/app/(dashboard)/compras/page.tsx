@@ -32,118 +32,15 @@ import { SupplierFormDialog, SupplierData } from "@/components/compras/supplier-
 import { PurchaseFormDialog, PurchaseRecord } from "@/components/compras/purchase-form-dialog";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { getSuppliersData } from "@/actions/data-fetchers";
-
-const INITIAL_SUPPLIERS: SupplierData[] = [
-  {
-    id: "p1",
-    ruc: "20100190797",
-    razonSocial: "GLORIA S.A.",
-    contactoNombre: "Marcos Del Solar",
-    telefono: "987 654 321",
-    email: "ventas@gloria.com.pe",
-    direccion: "Av. República de Panamá 2461 - Lima",
-    condicionPago: "Crédito 30 días",
-    totalComprado: 34580.00,
-    estado: "Activo",
-  },
-  {
-    id: "p2",
-    ruc: "20100055237",
-    razonSocial: "ALICORP S.A.A.",
-    contactoNombre: "Patricia Romero",
-    telefono: "976 543 210",
-    email: "pedidos@alicorp.com.pe",
-    direccion: "Av. Argentina 4793 - Callao",
-    condicionPago: "Crédito 30 días",
-    totalComprado: 52140.00,
-    estado: "Activo",
-  },
-  {
-    id: "p3",
-    ruc: "20100070970",
-    razonSocial: "BACKUS Y JOHNSTON S.A.A.",
-    contactoNombre: "Gonzalo Vargas",
-    telefono: "(01) 311-3000",
-    email: "atencion@backus.pe",
-    direccion: "Av. Nicolás Ayllón 3986 - Ate",
-    condicionPago: "Contado",
-    totalComprado: 28900.00,
-    estado: "Activo",
-  },
-  {
-    id: "p4",
-    ruc: "20100152356",
-    razonSocial: "PROCTER & GAMBLE DEL PERÚ S.R.L.",
-    contactoNombre: "Luciana Costa",
-    telefono: "(01) 618-5000",
-    email: "pedidos@pg.com",
-    direccion: "Av. Víctor Andrés Belaúnde 147 - San Isidro",
-    condicionPago: "Crédito 60 días",
-    totalComprado: 19450.00,
-    estado: "Activo",
-  },
-];
-
-const INITIAL_PURCHASES: PurchaseRecord[] = [
-  {
-    id: "c1",
-    numeroFactura: "F001-0089123",
-    proveedorId: "p1",
-    proveedorNombre: "GLORIA S.A.",
-    proveedorRuc: "20100190797",
-    fechaEmision: "15/08/2026",
-    fechaRecepcion: "15/08/2026",
-    subtotal: 1250.00,
-    igv: 225.00,
-    total: 1475.00,
-    condicionPago: "Crédito 30 días",
-    estado: "Recibido",
-    items: [
-      { productoId: "1", nombre: "Leche Gloria Entera 400g", sku: "GLO-001", cantidad: 240, costoUnitario: 3.20, total: 768.00, lote: "L-2026-095", vencimiento: "15/03/2027" },
-      { productoId: "5", nombre: "Yogurt Gloria Fresa 1L", sku: "YOG-001", cantidad: 96, costoUnitario: 5.40, total: 518.40, lote: "L-2026-102", vencimiento: "30/10/2026" },
-    ],
-  },
-  {
-    id: "c2",
-    numeroFactura: "F002-0041890",
-    proveedorId: "p2",
-    proveedorNombre: "ALICORP S.A.A.",
-    proveedorRuc: "20100055237",
-    fechaEmision: "14/08/2026",
-    fechaRecepcion: "14/08/2026",
-    subtotal: 2840.00,
-    igv: 511.20,
-    total: 3351.20,
-    condicionPago: "Crédito 30 días",
-    estado: "Recibido",
-    items: [
-      { productoId: "2", nombre: "Aceite Primor Premium 1L", sku: "PRI-001", cantidad: 180, costoUnitario: 7.50, total: 1350.00 },
-      { productoId: "4", nombre: "Detergente Bolívar 1kg", sku: "BOL-001", cantidad: 150, costoUnitario: 6.20, total: 930.00 },
-      { productoId: "6", nombre: "Fideos Don Vittorio 1kg", sku: "DON-001", cantidad: 200, costoUnitario: 3.10, total: 620.00 },
-    ],
-  },
-  {
-    id: "c3",
-    numeroFactura: "F001-0012055",
-    proveedorId: "p3",
-    proveedorNombre: "BACKUS Y JOHNSTON S.A.A.",
-    proveedorRuc: "20100070970",
-    fechaEmision: "12/08/2026",
-    fechaRecepcion: "13/08/2026",
-    subtotal: 1890.00,
-    igv: 340.20,
-    total: 2230.20,
-    condicionPago: "Contado",
-    estado: "Recibido",
-    items: [],
-  },
-];
+import { getSuppliersData, getPurchasesData } from "@/actions/data-fetchers";
+import { RefreshCw } from "lucide-react";
 
 export default function ComprasPage() {
   const [activeTab, setActiveTab] = useState<"recepciones" | "proveedores">("recepciones");
-  const [purchases, setPurchases] = useState<PurchaseRecord[]>(INITIAL_PURCHASES);
-  const [suppliers, setSuppliers] = useState<SupplierData[]>(INITIAL_SUPPLIERS);
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Pagination states
@@ -161,18 +58,29 @@ export default function ComprasPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nombre: string } | null>(null);
 
-  useEffect(() => {
-    async function loadSuppliers() {
-      try {
-        const data = await getSuppliersData();
-        if (data && data.length > 0) {
-          setSuppliers(data);
-        }
-      } catch (err) {
-        console.error("Error fetching suppliers:", err);
+  const loadData = async (showToast = false) => {
+    try {
+      if (showToast) setIsRefreshing(true);
+      const [suppData, purchData] = await Promise.all([
+        getSuppliersData(),
+        getPurchasesData(),
+      ]);
+      if (suppData) setSuppliers(suppData as SupplierData[]);
+      if (purchData) setPurchases(purchData);
+      if (showToast) {
+        toast.success(`Compras y proveedores actualizados: ${suppData?.length || 0} proveedores y ${purchData?.length || 0} recepciones.`);
       }
+    } catch (err) {
+      console.error("Error fetching purchases and suppliers:", err);
+      if (showToast) toast.error("Error al actualizar compras.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-    loadSuppliers();
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const totalCompradoMes = purchases.reduce((acc, p) => acc + p.total, 0);
@@ -250,6 +158,15 @@ export default function ComprasPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => loadData(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50"
+            title="Sincronizar compras y proveedores desde la Base de Datos"
+          >
+            <RefreshCw className={`size-3.5 text-blue-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
           <button
             onClick={() => {
               setEditingSupplier(null);

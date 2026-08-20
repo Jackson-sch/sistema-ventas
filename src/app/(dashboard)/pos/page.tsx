@@ -82,13 +82,6 @@ interface CartItem {
   tipo: "unidad" | "peso";
 }
 
-const INITIAL_PRODUCTS: CartItem[] = [
-  { id: "1", sku: "775123456789", nombre: "Leche Gloria Entera 400g", categoria: "Lácteos", precio: 4.50, cantidad: 2, tipo: "unidad" },
-  { id: "2", sku: "775987654321", nombre: "Arroz Costeño Extra 1kg", categoria: "Abarrotes", precio: 5.20, cantidad: 1, tipo: "unidad" },
-  { id: "3", sku: "775456789123", nombre: "Aceite Primor Premium 1L", categoria: "Abarrotes", precio: 9.80, cantidad: 1, tipo: "unidad" },
-  { id: "4", sku: "200000012345", nombre: "Manzana Delicia Nacional (kg)", categoria: "Frutas", precio: 4.80, cantidad: 1.5, tipo: "peso" },
-];
-
 const QUICK_AMOUNTS = [10, 20, 50, 100, 200];
 
 interface PosClient {
@@ -99,17 +92,18 @@ interface PosClient {
   points: number;
 }
 
-const DEMO_CLIENTS: PosClient[] = [
-  { id: "client-varios", doc: "00000000", name: "Clientes Varios", type: "DNI", points: 0 },
-  { id: "client-demo-1", doc: "45892144", name: "Juan Pérez García", type: "DNI", points: 148 },
-  { id: "client-demo-2", doc: "20601234567", name: "Inversiones Retail SAC", type: "RUC", points: 420 },
-  { id: "client-demo-3", doc: "72109845", name: "Ana Torres Silva", type: "DNI", points: 86 },
-];
+const DEFAULT_CLIENT: PosClient = {
+  id: "client-varios",
+  doc: "00000000",
+  name: "Clientes Varios",
+  type: "DNI",
+  points: 0,
+};
 
 export default function PosPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [catalogProducts, setCatalogProducts] = useState<CartItem[]>(INITIAL_PRODUCTS);
-  const [clients, setClients] = useState<PosClient[]>(DEMO_CLIENTS);
+  const [catalogProducts, setCatalogProducts] = useState<CartItem[]>([]);
+  const [clients, setClients] = useState<PosClient[]>([DEFAULT_CLIENT]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
@@ -218,7 +212,7 @@ export default function PosPage() {
               type: c.tipoDoc,
               points: c.puntos,
             }));
-          setClients([DEMO_CLIENTS[0], ...filteredDbClients]);
+          setClients([DEFAULT_CLIENT, ...filteredDbClients]);
         }
       })
       .catch((err) => console.error("Error cargando catálogo POS:", err));

@@ -26,128 +26,13 @@ import { AuditDetailDialog, AuditEvent } from "@/components/auditoria/audit-deta
 import { TablePagination } from "@/components/ui/table-pagination";
 import { getAuditLogsData } from "@/actions/data-fetchers";
 
-const INITIAL_AUDIT_LOGS: AuditEvent[] = [
-  {
-    id: "EVT-90412",
-    timestamp: "15/08/2026 11:42:15",
-    accion: "Emisión de Boleta Electrónica",
-    categoria: "Facturación SUNAT",
-    severidad: "informativo",
-    usuario: "Carlos Alarcón",
-    rolUsuario: "Cajero POS",
-    sucursal: "Sucursal Central - Surco",
-    terminal: "Caja 01 - Principal",
-    ip: "192.168.1.101",
-    detalles: "Emisión exitosa del comprobante B001-00042918 por S/ 24.00 a Clientes Varios (Medio de pago: Efectivo).",
-    payload: {
-      comprobante: "B001-00042918",
-      monto: 24.00,
-      medioPago: "efectivo",
-      itemsCount: 3,
-      hashSunat: "q7E4u9Yx1P3a8B2=",
-    },
-  },
-  {
-    id: "EVT-90411",
-    timestamp: "15/08/2026 11:30:04",
-    accion: "Eliminación de Ítem con PIN de Supervisor",
-    categoria: "Seguridad",
-    severidad: "advertencia",
-    usuario: "Carlos Alarcón",
-    rolUsuario: "Cajero POS",
-    supervisorAutorizo: "Marcos Ramos (PIN 7741)",
-    sucursal: "Sucursal Central - Surco",
-    terminal: "Caja 01 - Principal",
-    ip: "192.168.1.101",
-    detalles: "El cajero solicitó eliminar 'Leche Gloria Entera 400g (x2)' del ticket. Operación autorizada mediante PIN de supervisor.",
-    payload: {
-      producto: "Leche Gloria Entera 400g",
-      sku: "775123456789",
-      cantidadEliminada: 2,
-      montoAfectado: 9.00,
-      supervisorId: "u3",
-    },
-  },
-  {
-    id: "EVT-90410",
-    timestamp: "15/08/2026 10:50:22",
-    accion: "Retiro de Efectivo a Bóveda (Egreso)",
-    categoria: "Caja & POS",
-    severidad: "advertencia",
-    usuario: "Carlos Alarcón",
-    rolUsuario: "Cajero POS",
-    supervisorAutorizo: "Marcos Ramos (PIN 7741)",
-    sucursal: "Sucursal Central - Surco",
-    terminal: "Caja 01 - Principal",
-    ip: "192.168.1.101",
-    detalles: "Retiro preventivo de efectivo de gaveta a bóveda principal por límite de seguridad excedido. Monto: S/ 800.00.",
-    payload: {
-      montoRetirado: 800.00,
-      motivo: "Exceso de efectivo en gaveta - Retiro preventivo a bóveda",
-      saldoRestanteEnCaja: 650.00,
-    },
-  },
-  {
-    id: "EVT-90409",
-    timestamp: "15/08/2026 10:15:30",
-    accion: "Emisión de Nota de Crédito Electrónica",
-    categoria: "Facturación SUNAT",
-    severidad: "critico",
-    usuario: "Marcos Ramos",
-    rolUsuario: "Supervisor de Tienda",
-    sucursal: "Sucursal Central - Surco",
-    terminal: "Caja 02 - Rápida",
-    ip: "192.168.1.102",
-    detalles: "Emisión de Nota de Crédito BC01-0000045 por S/ 45.80 anulando comprobante B001-00042917 (Motivo: 01 Anulación de la operación). Reincorporación de 4 ítems al inventario.",
-    payload: {
-      comprobanteModificado: "B001-00042917",
-      notaCredito: "BC01-0000045",
-      totalDevuelto: 45.80,
-      reingresoStock: true,
-    },
-  },
-  {
-    id: "EVT-90408",
-    timestamp: "15/08/2026 09:30:10",
-    accion: "Ajuste de Kardex por Merma de Perecible",
-    categoria: "Inventario",
-    severidad: "advertencia",
-    usuario: "Esteban Vega",
-    rolUsuario: "Encargado de Almacén",
-    sucursal: "Sucursal Central - Surco",
-    terminal: "Terminal Almacén 01",
-    ip: "192.168.1.200",
-    detalles: "Registro de merma de 6 und de 'Yogurt Gloria Fresa 1L' por fecha de vencimiento alcanzada. Documento de sustento: ACT-2026-088.",
-    payload: {
-      sku: "775889900112",
-      producto: "Yogurt Gloria Fresa 1L",
-      cantidadMerma: 6,
-      costoTotalPerdida: 32.40,
-      actaReferencia: "ACT-2026-088",
-    },
-  },
-  {
-    id: "EVT-90407",
-    timestamp: "15/08/2026 08:00:00",
-    accion: "Apertura de Turno de Caja #00124",
-    categoria: "Caja & POS",
-    severidad: "informativo",
-    usuario: "Carlos Alarcón",
-    rolUsuario: "Cajero POS",
-    sucursal: "Sucursal Central - Surco",
-    terminal: "Caja 01 - Principal",
-    ip: "192.168.1.101",
-    detalles: "Apertura formal de turno #00124 con fondo inicial de sencillo de S/ 200.00 en gaveta física.",
-    payload: {
-      turno: "00124",
-      montoInicial: 200.00,
-      caja: "Caja 01 - Principal",
-    },
-  },
-];
+import { useQueryState, parseAsString } from "nuqs";
+import { RefreshCw } from "lucide-react";
 
 export default function AuditoriaPage() {
-  const [logs, setLogs] = useState<AuditEvent[]>(INITIAL_AUDIT_LOGS);
+  const [logs, setLogs] = useState<AuditEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -158,17 +43,26 @@ export default function AuditoriaPage() {
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  useEffect(() => {
-    async function loadAuditLogs() {
-      try {
-        const data = await getAuditLogsData();
-        if (data && data.length > 0) {
-          setLogs(data);
+  const loadAuditLogs = async (showToast = false) => {
+    try {
+      if (showToast) setIsRefreshing(true);
+      const data = await getAuditLogsData();
+      if (data) {
+        setLogs(data);
+        if (showToast) {
+          toast.success(`Auditoría actualizada: ${data.length} eventos recuperados de la Base de Datos.`);
         }
-      } catch (err) {
-        console.error("Error fetching audit logs:", err);
       }
+    } catch (err) {
+      console.error("Error fetching audit logs:", err);
+      if (showToast) toast.error("Error al actualizar registros de auditoría.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  useEffect(() => {
     loadAuditLogs();
   }, []);
 
@@ -218,6 +112,15 @@ export default function AuditoriaPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => loadAuditLogs(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50"
+            title="Sincronizar eventos de auditoría desde la Base de Datos"
+          >
+            <RefreshCw className={`size-3.5 text-blue-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
           <button
             onClick={handleExport}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors"
@@ -348,7 +251,29 @@ export default function AuditoriaPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-medium">
-            {paginatedLogs.map((log) => (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <tr key={`audit-skel-${idx}`} className="animate-pulse">
+                  <td className="py-4 px-4"><div className="h-4 w-24 bg-slate-800 rounded mb-1"></div><div className="h-3 w-16 bg-slate-800/60 rounded"></div></td>
+                  <td className="py-4 px-4"><div className="h-4 w-40 bg-slate-800 rounded mb-1"></div><div className="h-3 w-32 bg-slate-800/60 rounded"></div></td>
+                  <td className="py-4 px-4"><div className="h-5 w-20 bg-slate-800 rounded mx-auto"></div></td>
+                  <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-800 rounded"></div></td>
+                  <td className="py-4 px-4"><div className="h-4 w-24 bg-slate-800 rounded"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-5 w-16 bg-slate-800 rounded-full mx-auto"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-5 w-16 bg-slate-800 rounded-full mx-auto"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-7 w-12 bg-slate-800 rounded mx-auto"></div></td>
+                </tr>
+              ))
+            ) : paginatedLogs.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <ShieldCheck className="size-10 mx-auto stroke-[1.2] opacity-30 text-slate-400 mb-2" />
+                  <p className="text-sm font-semibold text-slate-400">No se encontraron eventos de auditoría</p>
+                  <p className="text-xs text-slate-600">Las acciones críticas del sistema se registrarán automáticamente aquí</p>
+                </td>
+              </tr>
+            ) : (
+              paginatedLogs.map((log) => (
               <tr key={log.id} className="hover:bg-slate-800/40 transition-colors group">
                 <td className="py-3.5 px-4">
                   <div className="font-mono font-bold text-white text-xs">{log.timestamp}</div>
@@ -407,7 +332,7 @@ export default function AuditoriaPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
 

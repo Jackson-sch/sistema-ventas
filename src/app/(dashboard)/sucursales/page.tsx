@@ -30,137 +30,12 @@ import { RegisterFormDialog, RegisterData } from "@/components/sucursales/regist
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { getBranchesAndRegistersData } from "@/actions/data-fetchers";
 
-const INITIAL_BRANCHES: BranchData[] = [
-  {
-    id: "b1",
-    codigoSunat: "0001",
-    nombre: "Sucursal Central - Surco",
-    direccion: "Av. Javier Prado Este 4200",
-    ciudad: "Lima - Surco",
-    telefono: "(01) 619-8000",
-    encargado: "Marcos Ramos",
-    cajasCount: 3,
-    estado: "Activa",
-  },
-  {
-    id: "b2",
-    codigoSunat: "0002",
-    nombre: "Sucursal San Isidro - Begonias",
-    direccion: "Calle Las Begonias 441",
-    ciudad: "Lima - San Isidro",
-    telefono: "(01) 442-8900",
-    encargado: "Patricia Mendoza",
-    cajasCount: 2,
-    estado: "Activa",
-  },
-  {
-    id: "b3",
-    codigoSunat: "0003",
-    nombre: "Sucursal Miraflores - Larco",
-    direccion: "Av. José Larco 850",
-    ciudad: "Lima - Miraflores",
-    telefono: "(01) 241-5500",
-    encargado: "Esteban Vega",
-    cajasCount: 2,
-    estado: "Activa",
-  },
-];
-
-const INITIAL_REGISTERS: RegisterData[] = [
-  {
-    id: "r1",
-    branchId: "b1",
-    nombre: "Caja 01 - Principal",
-    tipo: "Principal",
-    serieBoleta: "B001",
-    serieFactura: "F001",
-    serieNotaCredito: "BC01",
-    impresoraTipo: "Red (Ethernet/WiFi)",
-    impresoraIp: "192.168.1.150",
-    estado: "En Turno",
-    cajeroActual: "Carlos Alarcón",
-  },
-  {
-    id: "r2",
-    branchId: "b1",
-    nombre: "Caja 02 - Rápida",
-    tipo: "Rápida",
-    serieBoleta: "B002",
-    serieFactura: "F002",
-    serieNotaCredito: "BC02",
-    impresoraTipo: "Red (Ethernet/WiFi)",
-    impresoraIp: "192.168.1.151",
-    estado: "En Turno",
-    cajeroActual: "María Gómez",
-  },
-  {
-    id: "r3",
-    branchId: "b1",
-    nombre: "Caja 03 - Autoservicio",
-    tipo: "Autoservicio",
-    serieBoleta: "B003",
-    serieFactura: "F003",
-    serieNotaCredito: "BC03",
-    impresoraTipo: "USB / Directa",
-    estado: "Operativa",
-    cajeroActual: "Terminal Auto 01",
-  },
-  {
-    id: "r4",
-    branchId: "b2",
-    nombre: "Caja 01 - Principal",
-    tipo: "Principal",
-    serieBoleta: "B010",
-    serieFactura: "F010",
-    serieNotaCredito: "BC10",
-    impresoraTipo: "Red (Ethernet/WiFi)",
-    impresoraIp: "192.168.2.150",
-    estado: "En Turno",
-    cajeroActual: "Jorge Paredes",
-  },
-  {
-    id: "r5",
-    branchId: "b2",
-    nombre: "Caja 02 - Rápida",
-    tipo: "Rápida",
-    serieBoleta: "B011",
-    serieFactura: "F011",
-    serieNotaCredito: "BC11",
-    impresoraTipo: "Red (Ethernet/WiFi)",
-    impresoraIp: "192.168.2.151",
-    estado: "Operativa",
-  },
-  {
-    id: "r6",
-    branchId: "b3",
-    nombre: "Caja 01 - Principal",
-    tipo: "Principal",
-    serieBoleta: "B020",
-    serieFactura: "F020",
-    serieNotaCredito: "BC20",
-    impresoraTipo: "Red (Ethernet/WiFi)",
-    impresoraIp: "192.168.3.150",
-    estado: "En Turno",
-    cajeroActual: "Lucía Morales",
-  },
-  {
-    id: "r7",
-    branchId: "b3",
-    nombre: "Caja 02 - Express",
-    tipo: "Rápida",
-    serieBoleta: "B021",
-    serieFactura: "F021",
-    serieNotaCredito: "BC21",
-    impresoraTipo: "USB / Directa",
-    estado: "Operativa",
-  },
-];
-
 export default function SucursalesPage() {
-  const [branches, setBranches] = useState<BranchData[]>(INITIAL_BRANCHES);
-  const [registers, setRegisters] = useState<RegisterData[]>(INITIAL_REGISTERS);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>("b1");
-  const [isLoading, setIsLoading] = useState(false);
+  const [branches, setBranches] = useState<BranchData[]>([]);
+  const [registers, setRegisters] = useState<RegisterData[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Branch Dialog state
   const [isBranchFormOpen, setIsBranchFormOpen] = useState(false);
@@ -174,49 +49,55 @@ export default function SucursalesPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "branch" | "register"; id: string; name: string } | null>(null);
 
-  useEffect(() => {
-    async function loadBranches() {
-      setIsLoading(true);
-      try {
-        const data = await getBranchesAndRegistersData();
-        if (data && data.length > 0) {
-          const mappedBranches: BranchData[] = data.map((b) => ({
-            id: b.id,
-            codigoSunat: b.codigoSunat,
-            nombre: b.nombre,
-            direccion: b.direccion,
-            ciudad: "Lima",
-            telefono: b.telefono,
-            encargado: "Marcos Ramos",
-            cajasCount: b.cajasCount,
-            estado: b.activo ? "Activa" : "En Mantenimiento",
-          }));
-          setBranches(mappedBranches);
-          if (mappedBranches[0]) setSelectedBranchId(mappedBranches[0].id);
+  const loadBranches = async (showToast = false) => {
+    try {
+      if (showToast) setIsRefreshing(true);
+      const data = await getBranchesAndRegistersData();
+      if (data && data.length > 0) {
+        const mappedBranches: BranchData[] = data.map((b) => ({
+          id: b.id,
+          codigoSunat: b.codigoSunat,
+          nombre: b.nombre,
+          direccion: b.direccion,
+          ciudad: "Lima",
+          telefono: b.telefono,
+          encargado: "Marcos Ramos",
+          cajasCount: b.cajasCount,
+          estado: b.activo ? "Activa" : "En Mantenimiento",
+        }));
+        setBranches(mappedBranches);
+        if (mappedBranches[0]) setSelectedBranchId(mappedBranches[0].id);
 
-          const mappedRegisters: RegisterData[] = data.flatMap((b) =>
-            b.cajas.map((c) => ({
-              id: c.id,
-              branchId: b.id,
-              nombre: c.nombre,
-              tipo: c.tipo,
-              serieBoleta: c.serieBoleta,
-              serieFactura: c.serieFactura,
-              serieNotaCredito: c.serieNC,
-              impresoraTipo: "Red (Ethernet/WiFi)",
-              impresoraIp: c.ipImpresora,
-              estado: c.estado === "abierta" ? "En Turno" : "Operativa",
-              cajeroActual: c.cajeroActual,
-            }))
-          );
-          setRegisters(mappedRegisters);
+        const mappedRegisters: RegisterData[] = data.flatMap((b) =>
+          b.cajas.map((c) => ({
+            id: c.id,
+            branchId: b.id,
+            nombre: c.nombre,
+            tipo: c.tipo,
+            serieBoleta: c.serieBoleta,
+            serieFactura: c.serieFactura,
+            serieNotaCredito: c.serieNC,
+            impresoraTipo: "Red (Ethernet/WiFi)",
+            impresoraIp: c.ipImpresora,
+            estado: c.estado === "abierta" ? "En Turno" : "Operativa",
+            cajeroActual: c.cajeroActual,
+          }))
+        );
+        setRegisters(mappedRegisters);
+        if (showToast) {
+          toast.success(`Sucursales actualizadas: ${mappedBranches.length} tiendas y ${mappedRegisters.length} terminales sincronizadas.`);
         }
-      } catch (err) {
-        console.error("Error loading branches and registers:", err);
-      } finally {
-        setIsLoading(false);
       }
+    } catch (err) {
+      console.error("Error loading branches and registers:", err);
+      if (showToast) toast.error("Error al actualizar sucursales.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  useEffect(() => {
     loadBranches();
   }, []);
 
@@ -322,6 +203,15 @@ export default function SucursalesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => loadBranches(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50"
+            title="Sincronizar sucursales y terminales desde la Base de Datos"
+          >
+            <RefreshCw className={`size-3.5 text-blue-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
           <button
             onClick={handleOpenNewRegister}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors"
