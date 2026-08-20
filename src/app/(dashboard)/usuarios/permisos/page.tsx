@@ -34,10 +34,12 @@ import {
   getRolePermissionsMatrixAction,
   saveAllPermissionsMatrixAction,
   resetPermissionsAction,
+} from "@/actions/permissions-actions";
+import {
   RolePermissionMatrix,
   RiskLevel,
   MasterPermission,
-} from "@/actions/permissions-actions";
+} from "@/lib/permissions-data";
 
 export default function PermisosPage() {
   const [data, setData] = useState<RolePermissionMatrix | null>(null);
