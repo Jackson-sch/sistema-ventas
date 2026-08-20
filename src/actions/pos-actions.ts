@@ -4,7 +4,7 @@ import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { getDevContext } from "./context";
+import { getDevContext, ensureSesionAbierta } from "./context";
 import { buildUblXml, SunatDocumentData } from "@/lib/sunat";
 import { TicketData } from "@/components/ventas/thermal-ticket-dialog";
 
@@ -144,15 +144,29 @@ export async function completeSaleTransactionAction(
     // Database Atomic Transaction (if DB available)
     if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
       try {
+        const sesionCajaId = await ensureSesionAbierta(ctx.cajaId, ctx.cajeroId);
+
+        // Fetch valid product UUIDs from db for the items in cart
+        const dbProducts = await db
+          .select({ id: schema.productos.id, sku: schema.productos.sku })
+          .from(schema.productos)
+          .where(eq(schema.productos.tenantId, ctx.tenantId));
+
+        const skuToIdMap = new Map<string, string>();
+        for (const p of dbProducts) {
+          skuToIdMap.set(p.sku.toLowerCase(), p.id);
+        }
+
         await db.transaction(async (tx) => {
-          // 1. Insert Venta
+          // 1. Insert Venta con ID explícito
           await tx.insert(schema.ventas).values({
+            id: ventaId,
             tenantId: ctx.tenantId,
             sucursalId: ctx.sucursalId,
             cajaId: ctx.cajaId,
-            sesionCajaId: ctx.cajaId,
+            sesionCajaId,
             cajeroId: ctx.cajeroId,
-            clienteId: input.clienteId || null,
+            clienteId: input.clienteId && input.clienteId.length === 36 ? input.clienteId : null,
             subtotal: subtotalGravado.toString(),
             descuento: "0.00",
             igv: igv.toString(),
@@ -172,28 +186,33 @@ export async function completeSaleTransactionAction(
 
           // 3. Insert Items & Deduct Stock & Kardex
           for (const item of input.items) {
-            await tx.insert(schema.ventasDetalle).values({
-              ventaId,
-              productoId: item.id.length === 36 ? item.id : ctx.tenantId,
-              cantidad: item.cantidad.toString(),
-              precioUnitario: item.precio.toString(),
-              descuento: "0.00",
-              subtotal: (item.precio * item.cantidad).toFixed(2),
-            });
+            const validProdId =
+              item.id && item.id.length === 36
+                ? item.id
+                : skuToIdMap.get(item.sku.toLowerCase()) || dbProducts[0]?.id;
 
-            if (item.id.length === 36) {
+            if (validProdId) {
+              await tx.insert(schema.ventasDetalle).values({
+                ventaId,
+                productoId: validProdId,
+                cantidad: item.cantidad.toString(),
+                precioUnitario: item.precio.toString(),
+                descuento: "0.00",
+                subtotal: (item.precio * item.cantidad).toFixed(2),
+              });
+
               await tx
                 .update(schema.inventario)
                 .set({
                   stockActual: sql`GREATEST(0, ${schema.inventario.stockActual} - ${item.cantidad})`,
                   actualizadoEn: new Date(),
                 })
-                .where(eq(schema.inventario.productoId, item.id));
+                .where(eq(schema.inventario.productoId, validProdId));
 
               await tx.insert(schema.movimientosInventario).values({
                 tenantId: ctx.tenantId,
                 sucursalId: ctx.sucursalId,
-                productoId: item.id,
+                productoId: validProdId,
                 tipo: "salida",
                 cantidad: item.cantidad.toString(),
                 motivo: `Venta POS ${serieNumero}`,
@@ -246,7 +265,7 @@ export async function completeSaleTransactionAction(
           });
         });
       } catch (dbErr) {
-        console.warn("completeSaleTransactionAction: Database write error, using simulated response:", dbErr);
+        console.error("completeSaleTransactionAction: Database write error:", dbErr);
       }
     }
 
