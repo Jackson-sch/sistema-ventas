@@ -53,136 +53,13 @@ interface SaleRecord {
   }[];
 }
 
-const INITIAL_SALES: SaleRecord[] = [
-  {
-    id: "1",
-    comprobante: "B001-00042918",
-    tipo: "Boleta",
-    cliente: "Clientes Varios",
-    docNumero: "00000000",
-    medioPago: "efectivo",
-    caja: "Caja 01 - Principal",
-    cajero: "Carlos Alarcón",
-    total: 24.00,
-    fecha: "15/08/2026",
-    hora: "11:42:15",
-    estadoSunat: "aceptado",
-    hashSunat: "q7E4u9Yx1P3a8B2=",
-    items: [
-      { cantidad: 2, descripcion: "Leche Gloria Entera 400g", precioUnit: 4.50, total: 9.00, unidad: "und" },
-      { cantidad: 1, descripcion: "Aceite Primor Premium 1L", precioUnit: 9.80, total: 9.80, unidad: "und" },
-      { cantidad: 1, descripcion: "Arroz Costeño Extra 1kg", precioUnit: 5.20, total: 5.20, unidad: "und" },
-    ],
-  },
-  {
-    id: "2",
-    comprobante: "B001-00042917",
-    tipo: "Boleta",
-    cliente: "Juan Pérez García",
-    docNumero: "45892144",
-    medioPago: "yape",
-    caja: "Caja 01 - Principal",
-    cajero: "Carlos Alarcón",
-    total: 45.80,
-    fecha: "15/08/2026",
-    hora: "11:35:02",
-    estadoSunat: "aceptado",
-    hashSunat: "m2K8v4Lz0N9b3C1=",
-    items: [
-      { cantidad: 4, descripcion: "Leche Gloria Entera 400g", precioUnit: 4.50, total: 18.00, unidad: "und" },
-      { cantidad: 2, descripcion: "Aceite Primor Premium 1L", precioUnit: 9.80, total: 19.60, unidad: "und" },
-      { cantidad: 1.5, descripcion: "Manzana Delicia Nacional", precioUnit: 4.80, total: 7.20, unidad: "kg" },
-      { cantidad: 1, descripcion: "Bolsa Ecológica Biodegradable", precioUnit: 1.00, total: 1.00, unidad: "und" },
-    ],
-  },
-  {
-    id: "3",
-    comprobante: "F001-00001204",
-    tipo: "Factura",
-    cliente: "Inversiones Retail SAC",
-    docNumero: "20601234567",
-    medioPago: "tarjeta",
-    caja: "Caja 02 - Rápida",
-    cajero: "María Gómez",
-    total: 312.50,
-    fecha: "15/08/2026",
-    hora: "11:15:40",
-    estadoSunat: "aceptado",
-    hashSunat: "t5P1r9Wq3Z7d4F8=",
-    items: [
-      { cantidad: 20, descripcion: "Leche Gloria Entera 400g", precioUnit: 4.50, total: 90.00, unidad: "und" },
-      { cantidad: 15, descripcion: "Arroz Costeño Extra 1kg", precioUnit: 5.20, total: 78.00, unidad: "und" },
-      { cantidad: 10, descripcion: "Aceite Primor Premium 1L", precioUnit: 9.80, total: 98.00, unidad: "und" },
-      { cantidad: 5, descripcion: "Detergente Bolívar 1kg", precioUnit: 8.50, total: 42.50, unidad: "und" },
-      { cantidad: 4, descripcion: "Bolsa Reutilizable Grande", precioUnit: 1.00, total: 4.00, unidad: "und" },
-    ],
-  },
-  {
-    id: "4",
-    comprobante: "B001-00042916",
-    tipo: "Boleta",
-    cliente: "Clientes Varios",
-    docNumero: "00000000",
-    medioPago: "efectivo",
-    caja: "Caja 01 - Principal",
-    cajero: "Carlos Alarcón",
-    total: 12.50,
-    fecha: "15/08/2026",
-    hora: "10:58:19",
-    estadoSunat: "aceptado",
-    hashSunat: "k9N3x7Js1M5e6G2=",
-    items: [
-      { cantidad: 1, descripcion: "Detergente Bolívar 1kg", precioUnit: 8.50, total: 8.50, unidad: "und" },
-      { cantidad: 1, descripcion: "Jabón de Tocador Camay", precioUnit: 4.00, total: 4.00, unidad: "und" },
-    ],
-  },
-  {
-    id: "5",
-    comprobante: "B001-00042915",
-    tipo: "Boleta",
-    cliente: "Ana Torres Silva",
-    docNumero: "72109845",
-    medioPago: "plin",
-    caja: "Caja 02 - Rápida",
-    cajero: "María Gómez",
-    total: 64.90,
-    fecha: "15/08/2026",
-    hora: "10:42:01",
-    estadoSunat: "enviado",
-    hashSunat: "w4T8q2Yr6X0h7J3=",
-    items: [
-      { cantidad: 6, descripcion: "Yogurt Gloria Fresa 1L", precioUnit: 7.20, total: 43.20, unidad: "und" },
-      { cantidad: 3, descripcion: "Galletas Soda San Jorge", precioUnit: 1.50, total: 4.50, unidad: "und" },
-      { cantidad: 2, descripcion: "Cereal Ángel Flakes 500g", precioUnit: 8.60, total: 17.20, unidad: "und" },
-    ],
-  },
-  {
-    id: "6",
-    comprobante: "B001-00042914",
-    tipo: "Boleta",
-    cliente: "Clientes Varios",
-    docNumero: "00000000",
-    medioPago: "tarjeta",
-    caja: "Caja 03 - Autoservicio",
-    cajero: "Terminal Auto 01",
-    total: 112.30,
-    fecha: "15/08/2026",
-    hora: "10:30:11",
-    estadoSunat: "aceptado",
-    hashSunat: "b8V2c4Zn9M1k5L7=",
-    items: [
-      { cantidad: 10, descripcion: "Leche Gloria Entera 400g", precioUnit: 4.50, total: 45.00, unidad: "und" },
-      { cantidad: 5, descripcion: "Aceite Primor Premium 1L", precioUnit: 9.80, total: 49.00, unidad: "und" },
-      { cantidad: 3, descripcion: "Arroz Costeño Extra 1kg", precioUnit: 5.20, total: 15.60, unidad: "und" },
-      { cantidad: 2.7, descripcion: "Plátano Seda (kg)", precioUnit: 1.00, total: 2.70, unidad: "kg" },
-    ],
-  },
-];
-
 import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+import { RefreshCw } from "lucide-react";
 
 export default function VentasPage() {
-  const [sales, setSales] = useState<SaleRecord[]>(INITIAL_SALES);
+  const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
   const [filterDoc, setFilterDoc] = useQueryState("tipo", parseAsString.withDefault("all"));
   const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
@@ -196,17 +73,26 @@ export default function VentasPage() {
   const [targetCreditNote, setTargetCreditNote] = useState<SaleRecord | null>(null);
   const [isCreditNoteOpen, setIsCreditNoteOpen] = useState(false);
 
-  useEffect(() => {
-    async function loadSales() {
-      try {
-        const data = await getSalesHistoryData();
-        if (data && data.length > 0) {
-          setSales(data);
+  const loadSales = async (showToast = false) => {
+    try {
+      if (showToast) setIsRefreshing(true);
+      const data = await getSalesHistoryData();
+      if (data) {
+        setSales(data);
+        if (showToast) {
+          toast.success(`Historial actualizado: ${data.length} ventas sincronizadas desde PostgreSQL.`);
         }
-      } catch (err) {
-        console.error("Error fetching sales history:", err);
       }
+    } catch (err) {
+      console.error("Error fetching sales history:", err);
+      if (showToast) toast.error("Error al actualizar ventas.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  useEffect(() => {
     loadSales();
   }, []);
 
@@ -316,6 +202,15 @@ export default function VentasPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => loadSales(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50"
+            title="Sincronizar ventas en tiempo real desde la Base de Datos"
+          >
+            <RefreshCw className={`size-3.5 text-blue-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </button>
           <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors">
             <Download className="size-3.5 text-blue-400" /> Reporte de Ventas (Excel)
           </button>
@@ -443,7 +338,29 @@ export default function VentasPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-medium">
-            {paginatedSales.map((sale) => (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <tr key={`skel-${idx}`} className="animate-pulse">
+                  <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-800 rounded mb-1"></div><div className="h-3 w-16 bg-slate-800/60 rounded"></div></td>
+                  <td className="py-4 px-4"><div className="h-4 w-36 bg-slate-800 rounded mb-1"></div><div className="h-3 w-20 bg-slate-800/60 rounded"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-5 w-20 bg-slate-800 rounded-full mx-auto"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-4 w-24 bg-slate-800 rounded mx-auto"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-4 w-20 bg-slate-800 rounded mx-auto"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-5 w-16 bg-slate-800 rounded-full mx-auto"></div></td>
+                  <td className="py-4 px-4 text-right"><div className="h-4 w-16 bg-slate-800 rounded ml-auto"></div></td>
+                  <td className="py-4 px-4 text-center"><div className="h-7 w-20 bg-slate-800 rounded mx-auto"></div></td>
+                </tr>
+              ))
+            ) : paginatedSales.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <Receipt className="size-10 mx-auto stroke-[1.2] opacity-30 text-slate-400 mb-2" />
+                  <p className="text-sm font-semibold text-slate-400">No se encontraron ventas registradas</p>
+                  <p className="text-xs text-slate-600">Realiza cobros en el terminal POS para visualizarlos aquí</p>
+                </td>
+              </tr>
+            ) : (
+              paginatedSales.map((sale) => (
               <tr key={sale.id} className="hover:bg-slate-800/40 transition-colors group">
                 <td className="py-3.5 px-4">
                   <div className="font-mono font-bold text-white text-sm">{sale.comprobante}</div>
@@ -524,7 +441,7 @@ export default function VentasPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
 

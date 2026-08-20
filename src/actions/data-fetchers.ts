@@ -855,7 +855,7 @@ export async function getSalesHistoryData() {
           .leftJoin(schema.clientes, eq(schema.ventas.clienteId, schema.clientes.id))
           .leftJoin(schema.usuarios, eq(schema.ventas.cajeroId, schema.usuarios.id))
           .orderBy(desc(schema.ventas.creadoEn))
-          .limit(50),
+          .limit(200),
         db.select().from(schema.comprobantes),
         db.select().from(schema.ventasPagos),
         db
@@ -885,16 +885,20 @@ export async function getSalesHistoryData() {
         }
         const cajaMap = new Map(cajasRows.map((c) => [c.id, c.nombre]));
 
-        return ventasRows.map((v) => {
+        return ventasRows.map((v, idx) => {
           const comprobante = comprobanteMap.get(v.id);
           const pago = pagoMap.get(v.id);
           const detalle = detallePorVenta.get(v.id) ?? [];
+          const numDoc = v.clienteDoc || "00000000";
+          const isRuc = numDoc.length === 11;
+          const defaultTipo = isRuc ? "Factura" : "Boleta";
+
           return {
             id: v.id,
-            comprobante: comprobante ? `${comprobante.serie}-${comprobante.numero}` : `B001-${String(10000000 + ventasRows.indexOf(v))}`,
-            tipo: (comprobante?.tipo === "factura" ? "Factura" : comprobante?.tipo === "nota_credito" ? "Nota de Crédito" : "Boleta") as "Boleta" | "Factura" | "Nota de Crédito",
-            cliente: v.clienteNombre || "Clientes Varios",
-            docNumero: v.clienteDoc || "00000000",
+            comprobante: comprobante ? `${comprobante.serie}-${comprobante.numero}` : `${isRuc ? "F001" : "B001"}-${String(10000000 + idx)}`,
+            tipo: (comprobante?.tipo === "factura" ? "Factura" : comprobante?.tipo === "nota_credito" ? "Nota de Crédito" : defaultTipo) as "Boleta" | "Factura" | "Nota de Crédito",
+            cliente: v.clienteNombre || (numDoc === "00000000" ? "Clientes Varios" : "Cliente Particular"),
+            docNumero: numDoc,
             medioPago: ((pago?.medioPago === "tarjeta" ? "tarjeta" : pago?.medioPago === "yape" ? "yape" : pago?.medioPago === "plin" ? "plin" : "efectivo") as "efectivo" | "tarjeta" | "yape" | "plin"),
             caja: cajaMap.get(v.cajaId) ?? "Caja Principal",
             cajero: v.cajeroNombre || "Carlos Alarcón",
@@ -902,10 +906,10 @@ export async function getSalesHistoryData() {
             fecha: fmtFecha(new Date(v.creadoEn)),
             hora: fmtHora(new Date(v.creadoEn)),
             estadoSunat: ((comprobante?.estadoSunat === "anulado" ? "anulado" : comprobante?.estadoSunat === "enviado" ? "enviado" : "aceptado") as "aceptado" | "enviado" | "anulado"),
-            hashSunat: `7x8A9B2C3D4E5F6${ventasRows.indexOf(v)}`,
+            hashSunat: comprobante?.hash || `U1VOQVRfSEFTSF8${v.id.slice(0, 8)}`,
             items: detalle.map((d) => ({
               cantidad: parseFloat(d.cantidad),
-              descripcion: d.productoNombre || "Producto",
+              descripcion: d.productoNombre || "Producto Retail",
               precioUnit: parseFloat(d.precioUnitario),
               total: parseFloat(d.subtotal),
               unidad: d.unidadMedida || "und",
