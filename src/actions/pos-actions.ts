@@ -261,20 +261,36 @@ export async function completeSaleTransactionAction(
             tablaAfectada: "ventas",
             registroId: ventaId,
             accion: "crear",
-            datosNuevos: sql`jsonb_build_object('comprobante', ${serieNumero}, 'total', ${totalVenta}, 'pagos', ${JSON.stringify(effectivePayments)})`,
+            datosNuevos: {
+              comprobante: serieNumero,
+              total: totalVenta,
+              itemsCount: input.items.length,
+              pagos: effectivePayments,
+            },
           });
         });
       } catch (dbErr) {
         console.error("completeSaleTransactionAction: Database write error:", dbErr);
+        return {
+          success: false,
+          ventaId: "",
+          comprobanteSerieNumero: "",
+          ticketData: {} as TicketData,
+          error: dbErr instanceof Error ? dbErr.message : "Error al registrar la venta en base de datos.",
+        };
       }
     }
 
-    revalidatePath("/pos");
-    revalidatePath("/ventas");
-    revalidatePath("/inventario");
-    revalidatePath("/inventario/kardex");
-    revalidatePath("/clientes");
-    revalidatePath("/dashboard");
+    try {
+      revalidatePath("/pos");
+      revalidatePath("/ventas");
+      revalidatePath("/inventario");
+      revalidatePath("/inventario/kardex");
+      revalidatePath("/clientes");
+      revalidatePath("/dashboard");
+    } catch {
+      // Ignorar si se ejecuta fuera de contexto HTTP Next.js
+    }
 
     const ticketData: TicketData = {
       comprobante: serieNumero,
