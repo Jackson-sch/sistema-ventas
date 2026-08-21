@@ -64,6 +64,22 @@ export default function NuevaTransferenciaPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [cartItems, setCartItems] = useState<TransferCartItem[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Transfer & Transport metadata
   const [motivoTraslado, setMotivoTraslado] = useState<"04" | "01" | "02" | "13">("04");
@@ -554,7 +570,10 @@ export default function NuevaTransferenciaPage() {
         {/* Right Column: Search & Item Table (2 Cols) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Search Box */}
-          <div className="glass-panel rounded-3xl p-5 border border-slate-800 space-y-3 relative">
+          <div
+            ref={searchContainerRef}
+            className="glass-panel rounded-3xl p-5 border border-slate-800 space-y-3 relative z-40"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                 <Package className="size-4 text-emerald-400" /> Catálogo de Productos para Despacho
@@ -564,7 +583,7 @@ export default function NuevaTransferenciaPage() {
               </span>
             </div>
 
-            <div className="relative">
+            <div className="relative z-40">
               <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 ref={searchInputRef}
@@ -581,7 +600,7 @@ export default function NuevaTransferenciaPage() {
 
               {/* Floating Dropdown Results */}
               {isDropdownOpen && searchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden max-h-72 overflow-y-auto divide-y divide-slate-800">
+                <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700 shadow-2xl shadow-black/80 overflow-hidden max-h-72 overflow-y-auto divide-y divide-slate-800">
                   {searchResults.map((prod) => (
                     <button
                       key={prod.id}
