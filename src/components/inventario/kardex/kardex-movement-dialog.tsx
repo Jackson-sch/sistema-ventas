@@ -10,6 +10,14 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -283,16 +291,28 @@ export function KardexMovementDialog({
               <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
                 Tipo de Operación
               </label>
-              <select
+              <Select
                 value={tipoOperacion}
-                onChange={(e) => handleTypeChange(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onValueChange={(val: any) => handleTypeChange(val)}
               >
-                <option value="merma">Merma / Descarte (13)</option>
-                <option value="compra">Compra / Ingreso (02)</option>
-                <option value="ajuste">Ajuste Físico (99)</option>
-                <option value="salida">Salida Manual (01)</option>
-              </select>
+                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-950/80 border-slate-800 text-xs text-slate-200 focus:ring-1 focus:ring-blue-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-50">
+                  <SelectItem value="merma" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    Merma / Descarte (13)
+                  </SelectItem>
+                  <SelectItem value="compra" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    Compra / Ingreso (02)
+                  </SelectItem>
+                  <SelectItem value="ajuste" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    Ajuste Físico (99)
+                  </SelectItem>
+                  <SelectItem value="salida" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    Salida Manual (01)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
