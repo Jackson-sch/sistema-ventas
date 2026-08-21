@@ -5,6 +5,7 @@ import * as schema from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDevContext } from "./context";
+import { getNextCorrelativoNumber } from "./series-actions";
 import { buildGreXml, GreDocumentData, GreItem } from "@/lib/sunat";
 
 export interface TransferItemInput {
@@ -18,10 +19,13 @@ export interface TransferItemInput {
 
 export interface CreateTransferInput {
   sucursalOrigenId?: string;
+  sucursalOrigenNombre?: string;
+  direccionOrigen?: string;
+  ubigeoOrigen?: string;
   sucursalDestinoId: string;
   sucursalDestinoNombre: string;
-  direccionDestino: string;
-  ubigeoDestino: string;
+  direccionDestino?: string;
+  ubigeoDestino?: string;
   modalidadTransporte: "01" | "02";
   motivoTraslado?: "04" | "01" | "02" | "13";
   motivoDescripcion?: string;
@@ -79,9 +83,10 @@ export async function createStockTransferAction(
       return { success: false, error: "Debe agregar al menos un producto a transferir." };
     }
 
-    const serie = "T001";
-    const numeroConsecutivo = Math.floor(1 + Math.random() * 80);
-    const serieNumero = `${serie}-${numeroConsecutivo.toString().padStart(8, "0")}`;
+    const correlativoInfo = await getNextCorrelativoNumber("09", ctx.tenantId);
+    const serie = correlativoInfo.serie;
+    const numeroConsecutivo = correlativoInfo.numero;
+    const serieNumero = correlativoInfo.serieNumero;
     const fechaActual = new Date();
     const fechaEmisionStr = fechaActual.toISOString().split("T")[0];
 
@@ -103,12 +108,12 @@ export async function createStockTransferAction(
       unidadPeso: "KGM",
       totalBultos,
       partida: {
-        ubigeo: "150140",
-        direccion: "Av. Javier Prado Este 4200, Surco, Lima (Almacén Central)",
+        ubigeo: input.ubigeoOrigen || "150140",
+        direccion: input.direccionOrigen || `${input.sucursalOrigenNombre || "Almacén Central (Surco, Lima)"}`,
       },
       llegada: {
         ubigeo: input.ubigeoDestino || "150122",
-        direccion: input.direccionDestino || "Av. Larco 850, Miraflores, Lima",
+        direccion: input.direccionDestino || `${input.sucursalDestinoNombre}`,
       },
       remitente: {
         ruc: "20608945123",
@@ -123,7 +128,7 @@ export async function createStockTransferAction(
       destinatario: {
         tipoDoc: "6",
         numDoc: "20608945123",
-        nombre: "NOVAMARKET SUPERMERCADOS S.A.C. - SUCURSAL DESTINO",
+        nombre: `NOVAMARKET SUPERMERCADOS S.A.C. - ${input.sucursalDestinoNombre}`,
       },
       conductor: input.conductor
         ? {
@@ -160,13 +165,16 @@ export async function createStockTransferAction(
     // Database Atomic Transaction (if DB available)
     if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
       try {
+        const origenId = input.sucursalOrigenId && input.sucursalOrigenId.length === 36 ? input.sucursalOrigenId : ctx.sucursalId;
+        const destinoId = input.sucursalDestinoId && input.sucursalDestinoId.length === 36 ? input.sucursalDestinoId : ctx.sucursalId;
+
         await db.transaction(async (tx) => {
           // 1. Insert Transfer Header
           await tx.insert(schema.transferenciasStock).values({
             id: transferId,
             tenantId: ctx.tenantId,
-            sucursalOrigenId: ctx.sucursalId,
-            sucursalDestinoId: input.sucursalDestinoId.length === 36 ? input.sucursalDestinoId : ctx.sucursalId,
+            sucursalOrigenId: origenId,
+            sucursalDestinoId: destinoId,
             estado: "pendiente",
             solicitadoPor: ctx.cajeroId,
           } as any);
@@ -192,34 +200,41 @@ export async function createStockTransferAction(
               // Kardex output log
               await tx.insert(schema.movimientosInventario).values({
                 tenantId: ctx.tenantId,
-                sucursalId: ctx.sucursalId,
+                sucursalId: origenId,
                 productoId: item.productoId,
-                tipo: "salida",
-                cantidad: item.cantidad.toString(),
-                motivo: `Despacho GRE ${serieNumero} hacia ${input.sucursalDestinoNombre}`,
+                tipo: "transferencia_salida",
+                cantidad: (-item.cantidad).toString(),
+                motivo: `Traslado de Stock / GRE ${serieNumero} hacia ${input.sucursalDestinoNombre}`,
                 usuarioId: ctx.cajeroId,
               } as any);
             }
           }
 
-          // 3. Security Audit Log
+          // 3. Log Audit Trail
           await tx.insert(schema.auditoriaLog).values({
             tenantId: ctx.tenantId,
             usuarioId: ctx.cajeroId,
+            accion: "crear",
             tablaAfectada: "transferencias_stock",
             registroId: transferId,
-            accion: "crear",
-            datosNuevos: sql`jsonb_build_object('guia_remision', ${serieNumero}, 'destino', ${input.sucursalDestinoNombre}, 'bultos', ${totalBultos}, 'peso_kgm', ${pesoTotal})`,
+            datosNuevos: {
+              guia_remision: serieNumero,
+              origen: input.sucursalOrigenNombre || "Almacén Central",
+              destino: input.sucursalDestinoNombre,
+              bultos: totalBultos,
+              peso_kgm: pesoTotal,
+            },
           });
         });
       } catch (dbErr) {
-        console.warn("createStockTransferAction: DB error, fallback simulator:", dbErr);
+        console.warn("DB Transaction fallback on transfer create:", dbErr);
       }
     }
 
-    revalidatePath("/inventario");
-    revalidatePath("/inventario/kardex");
-    revalidatePath("/inventario/transferencias");
+    try {
+      revalidatePath("/inventario/transferencias");
+      revalidatePath("/inventario/kardex");
+    } catch {}
 
     const transfer: TransferRecord = {
       id: transferId,
