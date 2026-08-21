@@ -10,18 +10,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { getKardexMovementsData, getProductsData } from "@/actions/data-fetchers";
+import { getKardexMovementsData } from "@/actions/data-fetchers";
 import { KardexRecord } from "@/components/inventario/kardex/kardex-columns";
 import { KardexTable } from "@/components/inventario/kardex/kardex-table";
 import { KardexFilters } from "@/components/inventario/kardex/kardex-filters";
 import { KardexKpis } from "@/components/inventario/kardex/kardex-kpis";
 import { KardexMovementDialog } from "@/components/inventario/kardex/kardex-movement-dialog";
 
-type CatalogProduct = Awaited<ReturnType<typeof getProductsData>>[number];
-
 export default function KardexPage() {
   const [kardexRecords, setKardexRecords] = useState<KardexRecord[]>([]);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNewMovementOpen, setIsNewMovementOpen] = useState(false);
@@ -34,17 +31,10 @@ export default function KardexPage() {
   const loadData = async (showToast = false) => {
     try {
       if (showToast) setIsRefreshing(true);
-      const [kardexData, productsData] = await Promise.all([
-        getKardexMovementsData(),
-        getProductsData(),
-      ]);
+      const kardexData = await getKardexMovementsData();
 
       if (kardexData) {
         setKardexRecords(kardexData);
-      }
-
-      if (productsData && productsData.length > 0) {
-        setProducts(productsData);
       }
 
       if (showToast) {
@@ -161,7 +151,7 @@ export default function KardexPage() {
       <div className="glass-panel rounded-3xl border border-slate-800 overflow-hidden flex flex-col">
         {/* Filters and Search Bar */}
         <KardexFilters
-          products={products}
+          records={kardexRecords}
           selectedProduct={selectedProduct}
           onSelectProduct={setSelectedProduct}
           searchTerm={searchTerm}
@@ -179,11 +169,10 @@ export default function KardexPage() {
         />
       </div>
 
-      {/* Modal Registrar Movimiento Manual */}
+      {/* Modal Registrar Movimiento Manual con Buscador Asíncrono */}
       <KardexMovementDialog
         isOpen={isNewMovementOpen}
         onClose={() => setIsNewMovementOpen(false)}
-        products={products}
         onSuccess={() => loadData(false)}
       />
     </div>

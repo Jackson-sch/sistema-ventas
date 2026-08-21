@@ -115,7 +115,7 @@ export const kardexColumns: ColumnDef<KardexRecord>[] = [
         accessorKey: "productoNombre",
         header: "Producto / Detalle",
         cell: ({ row }) => (
-          <div className="font-sans min-w-[180px]">
+          <div className="font-sans min-w-45">
             <div className="font-bold text-white text-xs leading-tight">
               {row.original.productoNombre}
             </div>

@@ -291,3 +291,68 @@ export async function deleteProductAction(id: string, nombre: string) {
     };
   }
 }
+
+export interface ProductSearchResult {
+  id: string;
+  sku: string;
+  nombre: string;
+  categoria: string;
+  marca?: string;
+  tipoVenta: "unidad" | "peso";
+  stock: number;
+  precioCosto: number;
+  precioVenta: number;
+}
+
+export async function searchProductsAction(
+  query: string,
+  limit = 15
+): Promise<ProductSearchResult[]> {
+  try {
+    const ctx = await getDevContext();
+    const cleanQuery = query.trim().toLowerCase();
+
+    const rows = await db
+      .select({
+        id: productos.id,
+        sku: productos.sku,
+        nombre: productos.nombre,
+        categoria: categorias.nombre,
+        marca: productos.marca,
+        tipo: productos.tipo,
+        precioCosto: productos.precioCosto,
+        precioVenta: productos.precioVenta,
+        stockActual: inventario.stockActual,
+      })
+      .from(productos)
+      .leftJoin(categorias, eq(productos.categoriaId, categorias.id))
+      .leftJoin(
+        inventario,
+        and(
+          eq(inventario.productoId, productos.id),
+          eq(inventario.sucursalId, ctx.sucursalId)
+        )
+      )
+      .where(
+        cleanQuery
+          ? sql`(${productos.nombre} ILIKE ${'%' + cleanQuery + '%'} OR ${productos.sku} ILIKE ${'%' + cleanQuery + '%'})`
+          : undefined
+      )
+      .limit(limit);
+
+    return rows.map((r) => ({
+      id: r.id,
+      sku: r.sku,
+      nombre: r.nombre,
+      categoria: r.categoria || "General",
+      marca: r.marca || undefined,
+      tipoVenta: r.tipo === "peso" ? ("peso" as const) : ("unidad" as const),
+      stock: r.stockActual ? parseFloat(r.stockActual) : 0,
+      precioCosto: r.precioCosto ? parseFloat(r.precioCosto) : 0,
+      precioVenta: r.precioVenta ? parseFloat(r.precioVenta) : 0,
+    }));
+  } catch (error) {
+    console.error("Error in searchProductsAction:", error);
+    return [];
+  }
+}

@@ -1,47 +1,100 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Archive, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef, useTransition } from "react";
+import {
+  Archive,
+  CheckCircle2,
+  Search,
+  Barcode,
+  Package,
+  X,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { getProductsData } from "@/actions/data-fetchers";
-import { recordKardexAdjustmentAction } from "@/actions/inventory-actions";
-
-type CatalogProduct = Awaited<ReturnType<typeof getProductsData>>[number];
+import { formatCurrency } from "@/lib/utils";
+import {
+  recordKardexAdjustmentAction,
+  searchProductsAction,
+  ProductSearchResult,
+} from "@/actions/inventory-actions";
 
 interface KardexMovementDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  products: CatalogProduct[];
   onSuccess: () => void;
 }
 
 export function KardexMovementDialog({
   isOpen,
   onClose,
-  products,
   onSuccess,
 }: KardexMovementDialogProps) {
-  const [selectedProductId, setSelectedProductId] = useState("");
+  // Selected product state
+  const [selectedProduct, setSelectedProduct] = useState<ProductSearchResult | null>(null);
+
+  // Search combobox state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
+  const [isSearching, startSearchTransition] = useTransition();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Form fields
   const [tipoOperacion, setTipoOperacion] = useState<"merma" | "compra" | "ajuste" | "salida">("merma");
   const [cantidad, setCantidad] = useState("1");
-  const [costoUnitario, setCostoUnitario] = useState("3.50");
+  const [costoUnitario, setCostoUnitario] = useState("0.00");
   const [docReferencia, setDocReferencia] = useState("MERMA-2026-0001");
   const [motivo, setMotivo] = useState("Merma por producto caducado / dañado");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Click outside listener for dropdown
   useEffect(() => {
-    if (products.length > 0 && !selectedProductId) {
-      setSelectedProductId(products[0].id);
-      setCostoUnitario(products[0].precioCosto.toFixed(2));
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
     }
-  }, [products, selectedProductId]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const handleProductChange = (prodId: string) => {
-    setSelectedProductId(prodId);
-    const prod = products.find((p) => p.id === prodId);
-    if (prod) {
-      setCostoUnitario(prod.precioCosto.toFixed(2));
+  // Live debounced server search for products (avoids loading massive lists into memory)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      startSearchTransition(async () => {
+        const results = await searchProductsAction(searchQuery, 10);
+        setSearchResults(results);
+      });
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isOpen]);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      handleTypeChange("merma");
+      setSearchQuery("");
+      setSearchResults([]);
+      setIsDropdownOpen(false);
+      // Load top initial suggestions
+      startSearchTransition(async () => {
+        const initial = await searchProductsAction("", 8);
+        setSearchResults(initial);
+      });
     }
+  }, [isOpen]);
+
+  const handleSelectProduct = (prod: ProductSearchResult) => {
+    setSelectedProduct(prod);
+    setCostoUnitario(prod.precioCosto.toFixed(2));
+    setSearchQuery("");
+    setIsDropdownOpen(false);
   };
 
   const handleTypeChange = (type: "merma" | "compra" | "ajuste" | "salida") => {
@@ -64,6 +117,11 @@ export function KardexMovementDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProduct) {
+      toast.error("Por favor busque y seleccione un producto del catálogo.");
+      return;
+    }
+
     const qty = parseFloat(cantidad) || 0;
     const cost = parseFloat(costoUnitario) || 0;
     if (qty <= 0) {
@@ -71,18 +129,12 @@ export function KardexMovementDialog({
       return;
     }
 
-    const prod = products.find((p) => p.id === selectedProductId);
-    if (!prod) {
-      toast.error("Seleccione un producto válido del catálogo.");
-      return;
-    }
-
     setIsSaving(true);
     try {
       const res = await recordKardexAdjustmentAction({
-        productoId: prod.id,
-        sku: prod.sku,
-        productoNombre: prod.nombre,
+        productoId: selectedProduct.id,
+        sku: selectedProduct.sku,
+        productoNombre: selectedProduct.nombre,
         tipo: tipoOperacion === "compra" ? "ingreso" : tipoOperacion,
         cantidad: qty,
         costoUnitario: cost,
@@ -92,7 +144,7 @@ export function KardexMovementDialog({
 
       if (res.success) {
         toast.success("¡Movimiento de Kardex registrado y stock actualizado en base de datos!", {
-          description: `${prod.nombre} (${qty} ${prod.tipoVenta === "peso" ? "kg" : "und"})`,
+          description: `${selectedProduct.nombre} (${qty} ${selectedProduct.tipoVenta === "peso" ? "kg" : "und"})`,
         });
         onClose();
         onSuccess();
@@ -110,33 +162,120 @@ export function KardexMovementDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md glass-panel rounded-3xl p-6 shadow-2xl border border-slate-700/80 space-y-5 bg-[hsl(224,71%,4%)]">
+      <div className="w-full max-w-lg glass-panel rounded-3xl p-6 shadow-2xl border border-slate-700/80 space-y-5 bg-[hsl(224,71%,4%)]">
+        {/* Header */}
         <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
           <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
             <Archive className="size-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">Registrar Movimiento de Kardex</h3>
-            <p className="text-xs text-slate-400">Ajuste manual, merma o recepción extraordinaria</p>
+            <h3 className="text-base font-bold text-white tracking-tight">
+              Registrar Movimiento de Kardex
+            </h3>
+            <p className="text-xs text-slate-400">
+              Ajuste manual, merma o recepción extraordinaria
+            </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Searchable Product Combobox */}
           <div>
             <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
               Producto del Catálogo
             </label>
-            <select
-              value={selectedProductId}
-              onChange={(e) => handleProductChange(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre} ({p.sku}) — Stock: {p.stock} {p.tipoVenta === "peso" ? "kg" : "und"}
-                </option>
-              ))}
-            </select>
+
+            {selectedProduct ? (
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-blue-950/30 border border-blue-500/30">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
+                    <Package className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs text-white truncate">
+                      {selectedProduct.nombre}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 font-mono">
+                      <span>SKU: {selectedProduct.sku}</span>
+                      <span>•</span>
+                      <span className="text-emerald-400">
+                        Stock: {selectedProduct.stock} {selectedProduct.tipoVenta === "peso" ? "kg" : "und"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProduct(null)}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title="Cambiar producto"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <div ref={searchContainerRef} className="relative">
+                <div className="relative">
+                  <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    placeholder="Buscar producto por nombre, SKU o código..."
+                    className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    autoFocus
+                  />
+                  {isSearching ? (
+                    <Loader2 className="size-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 animate-spin" />
+                  ) : (
+                    <Barcode className="size-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                  )}
+                </div>
+
+                {/* Dropdown search results */}
+                {isDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1.5 max-h-56 overflow-y-auto rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl z-50 divide-y divide-slate-800 backdrop-blur-xl">
+                    {searchResults.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-500 font-sans">
+                        {isSearching ? "Buscando en catálogo..." : "No se encontraron productos coincidentes"}
+                      </div>
+                    ) : (
+                      searchResults.map((prod) => (
+                        <button
+                          key={prod.id}
+                          type="button"
+                          onClick={() => handleSelectProduct(prod)}
+                          className="w-full px-3.5 py-2.5 text-left hover:bg-blue-600/10 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-semibold text-xs text-slate-200 group-hover:text-blue-400 truncate">
+                              {prod.nombre}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 font-mono">
+                              <span>SKU: {prod.sku}</span>
+                              <span>•</span>
+                              <span>{prod.categoria}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-[11px] font-mono font-bold text-emerald-400">
+                              Stock: {prod.stock} {prod.tipoVenta === "peso" ? "kg" : "und"}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Costo: {formatCurrency(prod.precioCosto)}
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -226,7 +365,7 @@ export function KardexMovementDialog({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || !selectedProduct}
               className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <CheckCircle2 className="size-4" />

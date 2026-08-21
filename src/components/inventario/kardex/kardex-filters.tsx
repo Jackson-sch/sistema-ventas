@@ -1,12 +1,11 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { getProductsData } from "@/actions/data-fetchers";
-
-type CatalogProduct = Awaited<ReturnType<typeof getProductsData>>[number];
+import { useMemo } from "react";
+import { KardexRecord } from "./kardex-columns";
 
 interface KardexFiltersProps {
-  products: CatalogProduct[];
+  records: KardexRecord[];
   selectedProduct: string;
   onSelectProduct: (productId: string) => void;
   searchTerm: string;
@@ -16,7 +15,7 @@ interface KardexFiltersProps {
 }
 
 export function KardexFilters({
-  products,
+  records,
   selectedProduct,
   onSelectProduct,
   searchTerm,
@@ -24,9 +23,24 @@ export function KardexFilters({
   selectedOperation,
   onSelectOperation,
 }: KardexFiltersProps) {
+  // Extract only unique products that actually appear in the Kardex history (O(N) memory efficiency)
+  const uniqueProducts = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; sku: string }>();
+    for (const r of records) {
+      if (r.productoId && !map.has(r.productoId)) {
+        map.set(r.productoId, {
+          id: r.productoId,
+          name: r.productoNombre,
+          sku: r.sku,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [records]);
+
   return (
     <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-950/40">
-      {/* Product Filter */}
+      {/* Product Filter from Recorded History */}
       <div className="w-full md:w-72">
         <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
           Filtrar por Producto
@@ -34,18 +48,20 @@ export function KardexFilters({
         <select
           value={selectedProduct}
           onChange={(e) => onSelectProduct(e.target.value)}
-          className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+          className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
         >
-          <option value="all">Todos los Productos ({products.length})</option>
-          {products.map((p) => (
+          <option value="all">
+            Todos los Productos ({uniqueProducts.length} registrados)
+          </option>
+          {uniqueProducts.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.nombre} ({p.sku})
+              {p.name} ({p.sku})
             </option>
           ))}
         </select>
       </div>
 
-      {/* Search Input */}
+      {/* Global Search Input */}
       <div className="relative flex-1 w-full md:w-auto">
         <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
           Búsqueda Rápida
