@@ -69,21 +69,48 @@ export interface PurchaseOrderRecord {
 export async function getPurchaseOrdersAction(): Promise<PurchaseOrderRecord[]> {
   try {
     if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
-      const [ordenesRows, detalleRows, proveedoresRows, sucursalesRows, recepcionesRows, productosRows] =
-        await Promise.all([
-          db.select().from(schema.ordenesCompra).orderBy(desc(schema.ordenesCompra.creadoEn)),
-          db.select().from(schema.ordenesCompraDetalle),
-          db.select().from(schema.proveedores),
-          db.select().from(schema.sucursales),
-          db.select().from(schema.recepcionesMercaderia),
-          db.select().from(schema.productos),
-        ]);
+      const ordenesRows = await db
+        .select({
+          id: schema.ordenesCompra.id,
+          numero: schema.ordenesCompra.numero,
+          fechaEmision: schema.ordenesCompra.fechaEmision,
+          fechaEntregaEstimada: schema.ordenesCompra.fechaEntregaEstimada,
+          observaciones: schema.ordenesCompra.observaciones,
+          estado: schema.ordenesCompra.estado,
+          proveedorId: schema.ordenesCompra.proveedorId,
+          proveedorRuc: schema.proveedores.ruc,
+          proveedorRazonSocial: schema.proveedores.razonSocial,
+          proveedorContacto: schema.proveedores.contactoNombre,
+          proveedorTelefono: schema.proveedores.contactoTelefono,
+          proveedorEmail: schema.proveedores.contactoEmail,
+          sucursalNombre: schema.sucursales.nombre,
+        })
+        .from(schema.ordenesCompra)
+        .leftJoin(schema.proveedores, eq(schema.ordenesCompra.proveedorId, schema.proveedores.id))
+        .leftJoin(schema.sucursales, eq(schema.ordenesCompra.sucursalId, schema.sucursales.id))
+        .orderBy(desc(schema.ordenesCompra.creadoEn));
 
-      const provMap = new Map(proveedoresRows.map((p) => [p.id, p]));
-      const sucursalMap = new Map(sucursalesRows.map((s) => [s.id, s.nombre]));
-      const prodMap = new Map(productosRows.map((p) => [p.id, p]));
+      if (!ordenesRows || ordenesRows.length === 0) {
+        return [];
+      }
 
-      const detallePorOrden = new Map<string, (typeof detalleRows)[number][]>();
+      const [detalleRows, recepcionesRows] = await Promise.all([
+        db
+          .select({
+            ordenCompraId: schema.ordenesCompraDetalle.ordenCompraId,
+            productoId: schema.ordenesCompraDetalle.productoId,
+            cantidadPedida: schema.ordenesCompraDetalle.cantidadPedida,
+            cantidadRecibida: schema.ordenesCompraDetalle.cantidadRecibida,
+            precioUnitarioCosto: schema.ordenesCompraDetalle.precioUnitarioCosto,
+            productoNombre: schema.productos.nombre,
+            sku: schema.productos.sku,
+          })
+          .from(schema.ordenesCompraDetalle)
+          .leftJoin(schema.productos, eq(schema.ordenesCompraDetalle.productoId, schema.productos.id)),
+        db.select().from(schema.recepcionesMercaderia),
+      ]);
+
+      const detallePorOrden = new Map<string, typeof detalleRows>();
       for (const d of detalleRows) {
         const arr = detallePorOrden.get(d.ordenCompraId) ?? [];
         arr.push(d);
@@ -98,20 +125,17 @@ export async function getPurchaseOrdersAction(): Promise<PurchaseOrderRecord[]> 
       }
 
       return ordenesRows.map((o) => {
-        const prov = provMap.get(o.proveedorId);
-        const sucursal = sucursalMap.get(o.sucursalId) ?? "Sucursal Central";
         const itemsRaw = detallePorOrden.get(o.id) ?? [];
         const recRaw = recepcionesPorOrden.get(o.id) ?? [];
 
         const items: PurchaseOrderItem[] = itemsRaw.map((it) => {
-          const p = prodMap.get(it.productoId);
           const cantPedida = parseFloat(it.cantidadPedida);
           const cantRecibida = parseFloat(it.cantidadRecibida || "0");
           const costoUnit = parseFloat(it.precioUnitarioCosto);
           return {
             productoId: it.productoId,
-            sku: p?.sku || "SKU-001",
-            nombre: p?.nombre || "Producto",
+            sku: it.sku || "SKU-001",
+            nombre: it.productoNombre || "Producto",
             cantidadPedida: cantPedida,
             cantidadRecibida: cantRecibida,
             costoUnitario: costoUnit,
@@ -151,14 +175,14 @@ export async function getPurchaseOrdersAction(): Promise<PurchaseOrderRecord[]> 
           fechaEmision: o.fechaEmision ? new Date(`${o.fechaEmision}T00:00:00`).toLocaleDateString("es-PE") : "Hoy",
           fechaEntregaEstimada: o.fechaEntregaEstimada ? new Date(`${o.fechaEntregaEstimada}T00:00:00`).toLocaleDateString("es-PE") : "Próxima semana",
           proveedorId: o.proveedorId,
-          proveedorRuc: prov?.ruc || "20100190797",
-          proveedorRazonSocial: prov?.razonSocial || "Proveedor",
-          proveedorContacto: prov?.contactoNombre || "Ejecutivo de Cuentas",
-          proveedorTelefono: prov?.contactoTelefono || "987654321",
-          proveedorEmail: prov?.contactoEmail || "ventas@proveedor.pe",
+          proveedorRuc: o.proveedorRuc || "20100190797",
+          proveedorRazonSocial: o.proveedorRazonSocial || "Proveedor",
+          proveedorContacto: o.proveedorContacto || "Ejecutivo de Cuentas",
+          proveedorTelefono: o.proveedorTelefono || "987654321",
+          proveedorEmail: o.proveedorEmail || "ventas@proveedor.pe",
           condicionPago: "CREDITO_30D",
           moneda: "PEN",
-          sucursalDestino: sucursal,
+          sucursalDestino: o.sucursalNombre || "Sucursal Central",
           subtotal,
           igv,
           total,
