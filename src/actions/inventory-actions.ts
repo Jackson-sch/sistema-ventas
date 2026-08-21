@@ -171,15 +171,13 @@ export async function upsertProductAction(input: UpsertProductInput) {
 
 export interface KardexAdjustmentInput {
   productoId: string;
-  sku: string;
-  productoNombre: string;
-  tipoOperacion: "01" | "02" | "13" | "99"; // Venta, Compra, Merma, Ajuste
+  sku?: string;
+  productoNombre?: string;
+  tipo: "merma" | "ingreso" | "salida" | "ajuste";
   cantidad: number;
-  costoUnitario: number;
-  total: number;
-  tipoMovimiento: "entrada" | "salida";
-  sustento: string;
-  comprobanteReferencia: string;
+  costoUnitario?: number;
+  motivo: string;
+  documentoReferencia?: string;
 }
 
 export async function recordKardexAdjustmentAction(input: KardexAdjustmentInput) {
@@ -187,57 +185,71 @@ export async function recordKardexAdjustmentAction(input: KardexAdjustmentInput)
     const ctx = await getDevContext();
     const kardexId = crypto.randomUUID();
 
-    const tipoMovimiento =
-      input.tipoOperacion === "13" ? "merma" : input.tipoOperacion === "01" ? "salida" : "ingreso";
+    const isPositive = input.tipo === "ingreso" || (input.tipo === "ajuste" && input.cantidad > 0);
+    const signedQty = isPositive ? Math.abs(input.cantidad) : -Math.abs(input.cantidad);
+    const docRef = input.documentoReferencia || `${input.tipo.toUpperCase()}-${new Date().getFullYear()}`;
 
     await db.transaction(async (tx) => {
+      // 1. Insert Kardex Movement
       await tx.insert(movimientosInventario).values({
         id: kardexId,
         tenantId: ctx.tenantId,
         sucursalId: ctx.sucursalId,
         productoId: input.productoId,
-        tipo: tipoMovimiento,
-        cantidad: input.cantidad.toFixed(3),
-        motivo: input.sustento,
-        referenciaTipo: "kardex",
+        tipo: input.tipo as any,
+        cantidad: signedQty.toFixed(3),
+        motivo: `${input.motivo} [${docRef}]`,
+        referenciaTipo: "ajuste_manual",
         referenciaId: kardexId,
         usuarioId: ctx.cajeroId,
       });
 
-      const nuevoStock =
-        tipoMovimiento === "salida" || tipoMovimiento === "merma"
-          ? sql`GREATEST(${inventario.stockActual} - ${input.cantidad}, 0)`
-          : sql`${inventario.stockActual} + ${input.cantidad}`;
-
+      // 2. Update stock in inventory
+      const deltaStock = signedQty;
       await tx
         .update(inventario)
-        .set({ stockActual: nuevoStock, actualizadoEn: new Date() })
+        .set({
+          stockActual: sql`GREATEST(${inventario.stockActual} + ${deltaStock}, 0)`,
+          actualizadoEn: new Date(),
+        })
         .where(
           and(
             eq(inventario.productoId, input.productoId),
-            eq(inventario.sucursalId, ctx.sucursalId),
-          ),
+            eq(inventario.sucursalId, ctx.sucursalId)
+          )
         );
 
+      // 3. Security Audit Trail
       await tx.insert(auditoriaLog).values({
         tenantId: ctx.tenantId,
         usuarioId: ctx.cajeroId,
         tablaAfectada: "movimientos_inventario",
         registroId: kardexId,
         accion: "crear",
-        datosNuevos: { producto: input.productoNombre, tipo: tipoMovimiento, cantidad: input.cantidad, sustento: input.sustento },
+        datosNuevos: {
+          productoId: input.productoId,
+          producto: input.productoNombre,
+          tipo: input.tipo,
+          cantidad: input.cantidad,
+          costoUnitario: input.costoUnitario,
+          motivo: input.motivo,
+          documentoReferencia: docRef,
+        },
       });
     });
 
-    revalidatePath("/inventario");
-    revalidatePath("/inventario/kardex");
-    revalidatePath("/dashboard");
+    try {
+      revalidatePath("/inventario");
+      revalidatePath("/inventario/kardex");
+      revalidatePath("/dashboard");
+    } catch {}
 
     return {
       success: true,
       kardexId,
     };
   } catch (error: any) {
+    console.error("Error en recordKardexAdjustmentAction:", error);
     return {
       success: false,
       error: error.message || "Error al registrar movimiento en Kardex",

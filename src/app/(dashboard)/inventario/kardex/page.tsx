@@ -21,13 +21,16 @@ import {
   FileSpreadsheet,
   AlertCircle,
   Building2,
+  Boxes,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { getKardexMovementsData } from "@/actions/data-fetchers";
+import { getKardexMovementsData, getProductsData } from "@/actions/data-fetchers";
+import { recordKardexAdjustmentAction } from "@/actions/inventory-actions";
+import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 
 interface KardexRecord {
   id: string;
@@ -54,19 +57,11 @@ interface KardexRecord {
   saldoTotal: number;
 }
 
-const PRODUCTS_LIST = [
-  { id: "all", name: "Todos los Productos" },
-  { id: "1", name: "Leche Gloria Entera 400g (775123456789)" },
-  { id: "2", name: "Arroz Costeño Extra 1kg (775987654321)" },
-  { id: "3", name: "Aceite Primor Premium 1L (775456789123)" },
-  { id: "4", name: "Manzana Delicia Nacional (200000012345)" },
-  { id: "5", name: "Detergente Bolívar 1kg (775678912345)" },
-];
-
-import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+type CatalogProduct = Awaited<ReturnType<typeof getProductsData>>[number];
 
 export default function KardexPage() {
   const [kardexRecords, setKardexRecords] = useState<KardexRecord[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedProduct, setSelectedProduct] = useQueryState("prod", parseAsString.withDefault("all"));
@@ -76,30 +71,44 @@ export default function KardexPage() {
 
   // Modal new movement
   const [isNewMovementOpen, setIsNewMovementOpen] = useState(false);
-  const [newMovProduct, setNewMovProduct] = useState("1");
-  const [newMovType, setNewMovType] = useState<"compra" | "merma" | "ajuste">("merma");
+  const [newMovProduct, setNewMovProduct] = useState("");
+  const [newMovType, setNewMovType] = useState<"merma" | "compra" | "ajuste" | "salida">("merma");
   const [newMovQty, setNewMovQty] = useState("1");
-  const [newMovCost, setNewMovCost] = useState("3.40");
-  const [newMovDoc, setNewMovDoc] = useState("MERMA-0012");
+  const [newMovCost, setNewMovCost] = useState("3.50");
+  const [newMovDoc, setNewMovDoc] = useState("MERMA-2026-0001");
   const [newMovReason, setNewMovReason] = useState("Merma por producto caducado / dañado");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
 
-  const loadKardex = async (showToast = false) => {
+  const loadData = async (showToast = false) => {
     try {
       if (showToast) setIsRefreshing(true);
-      const data = await getKardexMovementsData();
-      if (data) {
-        setKardexRecords(data);
-        if (showToast) {
-          toast.success(`Kardex actualizado: ${data.length} movimientos de inventario sincronizados.`);
+      const [kardexData, productsData] = await Promise.all([
+        getKardexMovementsData(),
+        getProductsData(),
+      ]);
+
+      if (kardexData) {
+        setKardexRecords(kardexData);
+      }
+
+      if (productsData && productsData.length > 0) {
+        setProducts(productsData);
+        if (!newMovProduct) {
+          setNewMovProduct(productsData[0].id);
+          setNewMovCost(productsData[0].precioCosto.toFixed(2));
         }
       }
+
+      if (showToast) {
+        toast.success(`Kardex sincronizado: ${kardexData?.length || 0} movimientos cargados.`);
+      }
     } catch (err) {
-      console.error("Error fetching kardex movements:", err);
-      if (showToast) toast.error("Error al actualizar kardex.");
+      console.error("Error al cargar Kardex:", err);
+      if (showToast) toast.error("Error al sincronizar datos de Kardex.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -107,8 +116,78 @@ export default function KardexPage() {
   };
 
   useEffect(() => {
-    loadKardex();
+    loadData();
   }, []);
+
+  const handleSelectProduct = (prodId: string) => {
+    setNewMovProduct(prodId);
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      setNewMovCost(prod.precioCosto.toFixed(2));
+    }
+  };
+
+  const handleSelectType = (type: "merma" | "compra" | "ajuste" | "salida") => {
+    setNewMovType(type);
+    const randomCode = Math.floor(1000 + Math.random() * 9000);
+    if (type === "merma") {
+      setNewMovDoc(`MERMA-2026-${randomCode}`);
+      setNewMovReason("Merma por producto caducado / dañado");
+    } else if (type === "compra") {
+      setNewMovDoc(`F001-${Math.floor(1000000 + Math.random() * 9000000)}`);
+      setNewMovReason("Ingreso extraordinario / compra a proveedor");
+    } else if (type === "ajuste") {
+      setNewMovDoc(`AJ-2026-${randomCode}`);
+      setNewMovReason("Ajuste manual de inventario / conteo físico");
+    } else {
+      setNewMovDoc(`SAL-2026-${randomCode}`);
+      setNewMovReason("Salida manual por consumo interno o muestra");
+    }
+  };
+
+  const handleCreateMovement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = parseFloat(newMovQty) || 0;
+    const cost = parseFloat(newMovCost) || 0;
+    if (qty <= 0) {
+      toast.error("La cantidad debe ser mayor a cero.");
+      return;
+    }
+
+    const prod = products.find((p) => p.id === newMovProduct);
+    if (!prod) {
+      toast.error("Seleccione un producto válido del catálogo.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await recordKardexAdjustmentAction({
+        productoId: prod.id,
+        sku: prod.sku,
+        productoNombre: prod.nombre,
+        tipo: newMovType === "compra" ? "ingreso" : newMovType,
+        cantidad: qty,
+        costoUnitario: cost,
+        motivo: newMovReason,
+        documentoReferencia: newMovDoc,
+      });
+
+      if (res.success) {
+        toast.success("¡Movimiento de Kardex registrado y stock actualizado en base de datos!", {
+          description: `${prod.nombre} (${qty} ${prod.tipoVenta === "peso" ? "kg" : "und"})`,
+        });
+        setIsNewMovementOpen(false);
+        await loadData(false);
+      } else {
+        toast.error(res.error || "Error al registrar movimiento en Kardex.");
+      }
+    } catch {
+      toast.error("Error inesperado al registrar el movimiento.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const filtered = kardexRecords.filter((record) => {
     const matchesProduct = selectedProduct === "all" || record.productoId === selectedProduct;
@@ -116,10 +195,11 @@ export default function KardexPage() {
       selectedOperation === "all" ||
       (selectedOperation === "compra" && record.tipoOperacion === "02_COMPRA") ||
       (selectedOperation === "venta" && record.tipoOperacion === "01_VENTA") ||
-      (selectedOperation === "merma" && record.tipoOperacion === "13_MERMA");
+      (selectedOperation === "transferencia" && record.tipoOperacion === "11_TRANSFERENCIA") ||
+      (selectedOperation === "merma" && (record.tipoOperacion === "13_MERMA" || record.tipoOperacion === "99_AJUSTE"));
     const matchesSearch =
       record.productoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.sku.includes(searchTerm) ||
+      record.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.docSerieNumero.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesProduct && matchesOp && matchesSearch;
   });
@@ -129,7 +209,7 @@ export default function KardexPage() {
   // Calculate totals
   const totalEntradasSoles = filtered.reduce((acc, r) => acc + (r.entradaTotal || 0), 0);
   const totalSalidasSoles = filtered.reduce((acc, r) => acc + (r.salidaTotal || 0), 0);
-  const currentValuedStock = filtered[0]?.saldoTotal || 1368.20;
+  const currentValuedStock = filtered.reduce((acc, r) => acc + (r.saldoTotal || 0), 0);
 
   const handleExport = (format: "excel" | "sunat") => {
     toast.success(`Generando exportación de Kardex Valorado (${format.toUpperCase()})`, {
@@ -137,73 +217,28 @@ export default function KardexPage() {
     });
   };
 
-  const handleCreateMovement = (e: React.FormEvent) => {
-    e.preventDefault();
-    const qty = parseFloat(newMovQty) || 0;
-    const cost = parseFloat(newMovCost) || 0;
-    if (qty <= 0) {
-      toast.error("La cantidad debe ser mayor a cero");
-      return;
-    }
-
-    const prodInfo = PRODUCTS_LIST.find((p) => p.id === newMovProduct) || PRODUCTS_LIST[1];
-    const prevSaldo = kardexRecords[0]?.saldoCant || 100;
-    const newSaldoCant = newMovType === "compra" ? prevSaldo + qty : prevSaldo - qty;
-    const newSaldoTotal = +(newSaldoCant * cost).toFixed(2);
-
-    const newRecord: KardexRecord = {
-      id: Date.now().toString(),
-      fecha: "15/08/2026 " + new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
-      productoId: newMovProduct,
-      productoNombre: prodInfo.name.split(" (")[0],
-      sku: prodInfo.name.includes("(") ? prodInfo.name.split("(")[1].replace(")", "") : "775123456789",
-      categoria: "Lácteos",
-      tipoOperacion: newMovType === "compra" ? "02_COMPRA" : newMovType === "merma" ? "13_MERMA" : "99_AJUSTE",
-      operacionLabel: newMovReason,
-      tipoDoc: newMovType === "compra" ? "01_FACTURA" : "AJ_ACTA",
-      docSerieNumero: newMovDoc,
-      entradaCant: newMovType === "compra" ? qty : undefined,
-      entradaCostoUnit: newMovType === "compra" ? cost : undefined,
-      entradaTotal: newMovType === "compra" ? +(qty * cost).toFixed(2) : undefined,
-      salidaCant: newMovType !== "compra" ? qty : undefined,
-      salidaCostoUnit: newMovType !== "compra" ? cost : undefined,
-      salidaTotal: newMovType !== "compra" ? +(qty * cost).toFixed(2) : undefined,
-      saldoCant: newSaldoCant,
-      saldoCostoUnit: cost,
-      saldoTotal: newSaldoTotal,
-    };
-
-    setKardexRecords((prev) => [newRecord, ...prev]);
-    toast.success("Movimiento de Kardex registrado exitosamente");
-    setIsNewMovementOpen(false);
-  };
-
   return (
     <div className="flex-1 flex flex-col p-4 lg:p-6 gap-6 overflow-y-auto bg-[hsl(224,71%,4%)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Archive className="size-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                Kardex Valorado de Existencias
-                <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-400 text-[10px] font-mono">
-                  SUNAT 13.1
-                </Badge>
-              </h1>
-              <p className="text-xs text-slate-400">
-                Control permanente de inventarios valorizados por producto y método contable
-              </p>
-            </div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-950/80 text-blue-400 text-[10px] font-bold border border-blue-800/50">
+              SUNAT Formato 13.1
+            </span>
+            <span className="text-xs text-slate-500 font-mono">Registro de Inventario Permanente Valorado</span>
           </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+            <Archive className="size-6 text-blue-400" /> Kardex Valorado & Control Físico
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Trazabilidad tributaria de entradas, salidas, mermas, traslados y saldos valorizados de inventario.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => loadKardex(true)}
+            onClick={() => loadData(true)}
             disabled={isRefreshing}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50"
             title="Sincronizar movimientos de Kardex desde la Base de Datos"
@@ -224,7 +259,14 @@ export default function KardexPage() {
             <FileSpreadsheet className="size-3.5 text-emerald-400" /> Excel
           </button>
           <button
-            onClick={() => setIsNewMovementOpen(true)}
+            onClick={() => {
+              if (products.length > 0 && !newMovProduct) {
+                setNewMovProduct(products[0].id);
+                setNewMovCost(products[0].precioCosto.toFixed(2));
+              }
+              handleSelectType("merma");
+              setIsNewMovementOpen(true);
+            }}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-95"
           >
             <Plus className="size-3.5" /> Registrar Movimiento
@@ -234,7 +276,7 @@ export default function KardexPage() {
 
       {/* KPI Financial Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between">
+        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between border border-slate-800">
           <div>
             <div className="text-[11px] font-semibold uppercase text-slate-400">Método Contable</div>
             <div className="text-base font-bold text-white mt-1 flex items-center gap-1.5">
@@ -247,9 +289,9 @@ export default function KardexPage() {
           </div>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between">
+        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between border border-slate-800">
           <div>
-            <div className="text-[11px] font-semibold uppercase text-slate-400">Entradas por Compras</div>
+            <div className="text-[11px] font-semibold uppercase text-slate-400">Entradas / Compras</div>
             <div className="text-2xl font-mono font-extrabold text-emerald-400 mt-1">
               {formatCurrency(totalEntradasSoles)}
             </div>
@@ -260,38 +302,39 @@ export default function KardexPage() {
           </div>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between">
+        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between border border-slate-800">
           <div>
-            <div className="text-[11px] font-semibold uppercase text-slate-400">Costo de Ventas (Salidas)</div>
-            <div className="text-2xl font-mono font-extrabold text-blue-400 mt-1">
+            <div className="text-[11px] font-semibold uppercase text-slate-400">Salidas / Ventas</div>
+            <div className="text-2xl font-mono font-extrabold text-rose-400 mt-1">
               {formatCurrency(totalSalidasSoles)}
             </div>
-            <div className="text-[10px] text-slate-500 font-mono mt-0.5">Salidas por caja POS</div>
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5">Ventas y mermas</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
+          <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center border border-rose-500/20">
             <ArrowUpRight className="size-5" />
           </div>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between">
+        <div className="glass-panel rounded-2xl p-4 flex items-center justify-between border border-slate-800">
           <div>
-            <div className="text-[11px] font-semibold uppercase text-slate-400">Existencias Valorizadas</div>
-            <div className="text-2xl font-mono font-extrabold text-white mt-1">
-              {formatCurrency(currentValuedStock)}
+            <div className="text-[11px] font-semibold uppercase text-slate-400">Movimientos Registrados</div>
+            <div className="text-2xl font-mono font-extrabold text-blue-400 mt-1">
+              {filtered.length}
             </div>
-            <div className="text-[10px] text-emerald-400 font-mono mt-0.5">Saldo en almacén</div>
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5">Asientos en Kardex</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
-            <DollarSign className="size-5" />
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
+            <Boxes className="size-5" />
           </div>
         </div>
       </div>
 
-      {/* Filter Controls Bar */}
-      <div className="glass-panel rounded-2xl p-4 space-y-4">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          {/* Product Selector */}
-          <div className="w-full md:w-80">
+      {/* Main Table Card */}
+      <div className="glass-panel rounded-3xl border border-slate-800 overflow-hidden flex flex-col">
+        {/* Filters and Search Bar */}
+        <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-950/40">
+          {/* Product Filter */}
+          <div className="w-full md:w-72">
             <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
               Filtrar por Producto
             </label>
@@ -300,9 +343,10 @@ export default function KardexPage() {
               onChange={(e) => setSelectedProduct(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
             >
-              {PRODUCTS_LIST.map((p) => (
+              <option value="all">Todos los Productos ({products.length})</option>
+              {products.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {p.nombre} ({p.sku})
                 </option>
               ))}
             </select>
@@ -356,124 +400,160 @@ export default function KardexPage() {
                 Ventas
               </button>
               <button
+                onClick={() => setSelectedOperation("transferencia")}
+                className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
+                  selectedOperation === "transferencia" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Traslados
+              </button>
+              <button
                 onClick={() => setSelectedOperation("merma")}
                 className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
                   selectedOperation === "merma" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
                 }`}
               >
-                Mermas
+                Mermas / Ajustes
               </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Kardex Multi-Column Table Formato 13.1 */}
-      <div className="glass-panel rounded-2xl overflow-hidden">
+        {/* Kardex Sunat 13.1 Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              {/* Top Header Grouping */}
-              <tr className="border-b border-slate-800/90 bg-slate-950/95 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                <th colSpan={4} className="py-2.5 px-4 border-r border-slate-800">
-                  Documento de Traslado / Comprobante
+              {/* Super Header */}
+              <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] uppercase font-bold text-slate-400">
+                <th colSpan={4} className="py-2.5 px-4 border-r border-slate-800 text-slate-300">
+                  Documento & Transacción
                 </th>
-                <th colSpan={3} className="py-2.5 px-3 text-center border-r border-slate-800 bg-emerald-950/40 text-emerald-400">
-                  Entradas (Compras / Recepción)
+                <th colSpan={3} className="py-2.5 px-3 text-center border-r border-slate-800 bg-emerald-950/20 text-emerald-400">
+                  Entradas
                 </th>
-                <th colSpan={3} className="py-2.5 px-3 text-center border-r border-slate-800 bg-rose-950/40 text-rose-400">
-                  Salidas (Ventas POS / Mermas)
+                <th colSpan={3} className="py-2.5 px-3 text-center border-r border-slate-800 bg-rose-950/20 text-rose-400">
+                  Salidas
                 </th>
-                <th colSpan={3} className="py-2.5 px-3 text-center bg-blue-950/40 text-blue-300">
-                  Saldo Final en Existencias
+                <th colSpan={3} className="py-2.5 px-4 text-center bg-blue-950/20 text-blue-400">
+                  Saldo Final
                 </th>
               </tr>
-              {/* Detailed Sub-Header */}
-              <tr className="border-b border-slate-800/90 bg-slate-950 text-slate-500 uppercase tracking-wider font-semibold text-[10px]">
-                <th className="py-2.5 px-4">Fecha / Hora</th>
-                <th className="py-2.5 px-4">Producto & SKU</th>
-                <th className="py-2.5 px-3">Tipo Operación</th>
-                <th className="py-2.5 px-3 border-r border-slate-800">Doc. Referencia</th>
+              {/* Columns Header */}
+              <tr className="border-b border-slate-800 bg-slate-950/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                <th className="py-2 px-4">Fecha / Hora</th>
+                <th className="py-2 px-3">Tipo Op. (SUNAT)</th>
+                <th className="py-2 px-3">Comprobante</th>
+                <th className="py-2 px-3 border-r border-slate-800">Producto / Detalle</th>
                 {/* Entradas */}
-                <th className="py-2.5 px-3 text-center bg-emerald-950/20">Cantidad</th>
-                <th className="py-2.5 px-3 text-right bg-emerald-950/20">Costo Unit.</th>
-                <th className="py-2.5 px-3 text-right bg-emerald-950/20 border-r border-slate-800">Total (S/)</th>
+                <th className="py-2 px-3 text-center bg-emerald-950/10">Cant.</th>
+                <th className="py-2 px-3 text-right bg-emerald-950/10">Costo U.</th>
+                <th className="py-2 px-3 text-right border-r border-slate-800 bg-emerald-950/10">Total S/</th>
                 {/* Salidas */}
-                <th className="py-2.5 px-3 text-center bg-rose-950/20">Cantidad</th>
-                <th className="py-2.5 px-3 text-right bg-rose-950/20">Costo Unit.</th>
-                <th className="py-2.5 px-3 text-right bg-rose-950/20 border-r border-slate-800">Total (S/)</th>
-                {/* Saldo Final */}
-                <th className="py-2.5 px-3 text-center bg-blue-950/20">Cantidad</th>
-                <th className="py-2.5 px-3 text-right bg-blue-950/20">Costo Unit.</th>
-                <th className="py-2.5 px-4 text-right bg-blue-950/20">Total (S/)</th>
+                <th className="py-2 px-3 text-center bg-rose-950/10">Cant.</th>
+                <th className="py-2 px-3 text-right bg-rose-950/10">Costo U.</th>
+                <th className="py-2 px-3 text-right border-r border-slate-800 bg-rose-950/10">Total S/</th>
+                {/* Saldo */}
+                <th className="py-2 px-3 text-center bg-blue-950/10">Cant.</th>
+                <th className="py-2 px-3 text-right bg-blue-950/10">Costo U.</th>
+                <th className="py-2 px-4 text-right bg-blue-950/10">Total S/</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-medium">
-              {paginatedKardex.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="py-3 px-4 font-mono text-slate-400 text-[11px] whitespace-nowrap">
-                    {r.fecha}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-white text-xs">{r.productoNombre}</div>
-                    <div className="text-[10px] text-slate-500 font-mono">{r.sku}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    {r.tipoOperacion === "02_COMPRA" && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/50 whitespace-nowrap">
-                        <ArrowDownRight className="size-2.5" /> Compra
-                      </span>
-                    )}
-                    {r.tipoOperacion === "01_VENTA" && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/80 text-blue-400 border border-blue-800/50 whitespace-nowrap">
-                        <ArrowUpRight className="size-2.5" /> Venta POS
-                      </span>
-                    )}
-                    {r.tipoOperacion === "13_MERMA" && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-400 border border-rose-800/50 whitespace-nowrap">
-                        <TrendingDown className="size-2.5" /> Merma
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3 border-r border-slate-800">
-                    <div className="font-mono font-bold text-white text-xs">{r.docSerieNumero}</div>
-                    <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{r.operacionLabel}</div>
-                  </td>
-
-                  {/* Entradas */}
-                  <td className="py-3 px-3 text-center font-mono bg-emerald-950/10">
-                    {r.entradaCant ? <span className="text-emerald-400 font-bold">+{r.entradaCant}</span> : "-"}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-slate-300 bg-emerald-950/10 text-xs">
-                    {r.entradaCostoUnit ? formatCurrency(r.entradaCostoUnit) : "-"}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-emerald-400 font-bold bg-emerald-950/10 border-r border-slate-800 text-xs">
-                    {r.entradaTotal ? formatCurrency(r.entradaTotal) : "-"}
-                  </td>
-
-                  {/* Salidas */}
-                  <td className="py-3 px-3 text-center font-mono bg-rose-950/10">
-                    {r.salidaCant ? <span className="text-rose-400 font-bold">-{r.salidaCant}</span> : "-"}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-slate-300 bg-rose-950/10 text-xs">
-                    {r.salidaCostoUnit ? formatCurrency(r.salidaCostoUnit) : "-"}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-rose-400 font-bold bg-rose-950/10 border-r border-slate-800 text-xs">
-                    {r.salidaTotal ? formatCurrency(r.salidaTotal) : "-"}
-                  </td>
-
-                  {/* Saldo Final */}
-                  <td className="py-3 px-3 text-center font-mono bg-blue-950/10 font-bold text-white">
-                    {r.saldoCant}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-slate-300 bg-blue-950/10 text-xs">
-                    {formatCurrency(r.saldoCostoUnit)}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono text-emerald-400 font-extrabold bg-blue-950/10 text-sm">
-                    {formatCurrency(r.saldoTotal)}
+            <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+              {paginatedKardex.length === 0 ? (
+                <tr>
+                  <td colSpan={13} className="py-12 text-center text-slate-500 font-sans">
+                    <Archive className="size-8 mx-auto stroke-[1.2] opacity-30 text-slate-400 mb-2" />
+                    <p className="text-sm font-semibold text-slate-400">No se encontraron movimientos de Kardex</p>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Prueba cambiando los filtros o registra un nuevo movimiento manual.
+                    </p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paginatedKardex.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-900/40 transition-colors">
+                    {/* Fecha */}
+                    <td className="py-3 px-4 text-slate-400 whitespace-nowrap text-[11px]">
+                      {r.fecha}
+                    </td>
+
+                    {/* Tipo Operación */}
+                    <td className="py-3 px-3">
+                      {r.tipoOperacion === "01_VENTA" && (
+                        <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-400 text-[10px]">
+                          01 Venta POS
+                        </Badge>
+                      )}
+                      {r.tipoOperacion === "02_COMPRA" && (
+                        <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px]">
+                          02 Compra Prov.
+                        </Badge>
+                      )}
+                      {r.tipoOperacion === "13_MERMA" && (
+                        <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px]">
+                          13 Merma
+                        </Badge>
+                      )}
+                      {r.tipoOperacion === "11_TRANSFERENCIA" && (
+                        <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-400 text-[10px]">
+                          11 Traslado GRE
+                        </Badge>
+                      )}
+                      {r.tipoOperacion === "99_AJUSTE" && (
+                        <Badge variant="outline" className="border-purple-500/30 bg-purple-500/10 text-purple-400 text-[10px]">
+                          99 Ajuste Físico
+                        </Badge>
+                      )}
+                    </td>
+
+                    {/* Comprobante */}
+                    <td className="py-3 px-3 text-slate-300 font-bold">
+                      {r.docSerieNumero}
+                    </td>
+
+                    {/* Producto */}
+                    <td className="py-3 px-3 border-r border-slate-800 font-sans">
+                      <div className="font-bold text-white text-xs">{r.productoNombre}</div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        SKU: {r.sku} • {r.operacionLabel}
+                      </div>
+                    </td>
+
+                    {/* Entradas */}
+                    <td className="py-3 px-3 text-center font-mono bg-emerald-950/10">
+                      {r.entradaCant ? <span className="text-emerald-400 font-bold">+{r.entradaCant}</span> : "-"}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-slate-300 bg-emerald-950/10 text-xs">
+                      {r.entradaCostoUnit ? formatCurrency(r.entradaCostoUnit) : "-"}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-emerald-400 font-bold bg-emerald-950/10 border-r border-slate-800 text-xs">
+                      {r.entradaTotal ? formatCurrency(r.entradaTotal) : "-"}
+                    </td>
+
+                    {/* Salidas */}
+                    <td className="py-3 px-3 text-center font-mono bg-rose-950/10">
+                      {r.salidaCant ? <span className="text-rose-400 font-bold">-{r.salidaCant}</span> : "-"}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-slate-300 bg-rose-950/10 text-xs">
+                      {r.salidaCostoUnit ? formatCurrency(r.salidaCostoUnit) : "-"}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-rose-400 font-bold bg-rose-950/10 border-r border-slate-800 text-xs">
+                      {r.salidaTotal ? formatCurrency(r.salidaTotal) : "-"}
+                    </td>
+
+                    {/* Saldo Final */}
+                    <td className="py-3 px-3 text-center font-mono bg-blue-950/10 font-bold text-white">
+                      {r.saldoCant}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-slate-300 bg-blue-950/10 text-xs">
+                      {formatCurrency(r.saldoCostoUnit)}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-emerald-400 font-extrabold bg-blue-950/10 text-sm">
+                      {formatCurrency(r.saldoTotal)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
@@ -491,7 +571,7 @@ export default function KardexPage() {
       {/* Modal Registrar Movimiento Manual */}
       {isNewMovementOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md glass-panel rounded-3xl p-6 shadow-2xl border border-slate-700/80 space-y-5">
+          <div className="w-full max-w-md glass-panel rounded-3xl p-6 shadow-2xl border border-slate-700/80 space-y-5 bg-[hsl(224,71%,4%)]">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
               <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
                 <Archive className="size-5" />
@@ -505,16 +585,16 @@ export default function KardexPage() {
             <form onSubmit={handleCreateMovement} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
-                  Producto
+                  Producto del Catálogo
                 </label>
                 <select
                   value={newMovProduct}
-                  onChange={(e) => setNewMovProduct(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  onChange={(e) => handleSelectProduct(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
                 >
-                  {PRODUCTS_LIST.filter((p) => p.id !== "all").map((p) => (
+                  {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {p.nombre} ({p.sku}) — Stock: {p.stock} {p.tipoVenta === "peso" ? "kg" : "und"}
                     </option>
                   ))}
                 </select>
@@ -527,12 +607,13 @@ export default function KardexPage() {
                   </label>
                   <select
                     value={newMovType}
-                    onChange={(e) => setNewMovType(e.target.value as any)}
+                    onChange={(e) => handleSelectType(e.target.value as any)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="merma">Merma / Descarte</option>
-                    <option value="compra">Compra / Entrada</option>
-                    <option value="ajuste">Ajuste de Inventario</option>
+                    <option value="merma">Merma / Descarte (13)</option>
+                    <option value="compra">Compra / Ingreso (02)</option>
+                    <option value="ajuste">Ajuste Físico (99)</option>
+                    <option value="salida">Salida Manual (01)</option>
                   </select>
                 </div>
 
@@ -575,7 +656,7 @@ export default function KardexPage() {
                     type="text"
                     value={newMovDoc}
                     onChange={(e) => setNewMovDoc(e.target.value)}
-                    placeholder="MERMA-0012"
+                    placeholder="MERMA-2026-0001"
                     className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs font-mono text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                     required
                   />
@@ -606,9 +687,11 @@ export default function KardexPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all active:scale-95"
+                  disabled={isSaving}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="size-4" /> Guardar Movimiento
+                  <CheckCircle2 className="size-4" />
+                  {isSaving ? "Guardando..." : "Guardar Movimiento"}
                 </button>
               </div>
             </form>

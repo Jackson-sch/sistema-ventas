@@ -740,46 +740,85 @@ export async function getKardexMovementsData() {
           productoNombre: schema.productos.nombre,
           sku: schema.productos.sku,
           precioCosto: schema.productos.precioCosto,
+          categoriaNombre: schema.categorias.nombre,
         })
         .from(schema.movimientosInventario)
         .leftJoin(schema.productos, eq(schema.movimientosInventario.productoId, schema.productos.id))
+        .leftJoin(schema.categorias, eq(schema.productos.categoriaId, schema.categorias.id))
         .orderBy(desc(schema.movimientosInventario.creadoEn))
-        .limit(50);
+        .limit(100);
 
       if (rows && rows.length > 0) {
         return rows.map((r, idx) => {
-          const qty = parseFloat(r.cantidad);
+          const rawQty = parseFloat(r.cantidad);
+          const absQty = Math.abs(rawQty);
           const cost = parseFloat(r.precioCosto || "3.50");
-          const isEntrada = r.tipo === "ingreso" || r.tipo === "transferencia_entrada";
+
+          const isEntrada =
+            r.tipo === "ingreso" ||
+            r.tipo === "transferencia_entrada" ||
+            (r.tipo === "ajuste" && rawQty > 0);
+
           const esMerma = r.tipo === "merma";
           const esAjuste = r.tipo === "ajuste";
+          const esTransferencia =
+            r.tipo === "transferencia_salida" || r.tipo === "transferencia_entrada";
+          const esCompra = r.tipo === "ingreso";
+
+          const tipoOperacion: "01_VENTA" | "02_COMPRA" | "13_MERMA" | "11_TRANSFERENCIA" | "99_AJUSTE" =
+            esMerma
+              ? "13_MERMA"
+              : esAjuste
+              ? "99_AJUSTE"
+              : esTransferencia
+              ? "11_TRANSFERENCIA"
+              : esCompra
+              ? "02_COMPRA"
+              : "01_VENTA";
+
+          const tipoDoc: "01_FACTURA" | "03_BOLETA" | "09_GUIA" | "AJ_ACTA" =
+            esTransferencia
+              ? "09_GUIA"
+              : esMerma || esAjuste
+              ? "AJ_ACTA"
+              : esCompra
+              ? "01_FACTURA"
+              : "03_BOLETA";
+
+          // Extract document series if contained in brackets [DOC-...]
+          const matchDoc = r.motivo?.match(/\[(.*?)\]/);
+          const docSerieNumero = matchDoc
+            ? matchDoc[1]
+            : esTransferencia
+            ? "T001-GRE"
+            : esMerma
+            ? `MERMA-${String(100 + idx)}`
+            : esAjuste
+            ? `AJ-${String(100 + idx)}`
+            : `KDX-${String(1000 + idx)}`;
+
+          const cleanMotivo = r.motivo ? r.motivo.replace(/\[(.*?)\]/, "").trim() : "Movimiento de inventario";
 
           return {
             id: r.id,
             fecha: fmtFechaHora(new Date(r.fecha)),
             productoId: r.productoId,
-            productoNombre: r.productoNombre || "Producto",
+            productoNombre: r.productoNombre || "Producto Retail",
             sku: r.sku || "775123456789",
-            categoria: "General",
-            tipoOperacion: (esMerma
-              ? "13_MERMA"
-              : esAjuste
-              ? "99_AJUSTE"
-              : isEntrada
-              ? "02_COMPRA"
-              : "01_VENTA") as "01_VENTA" | "02_COMPRA" | "13_MERMA" | "11_TRANSFERENCIA" | "99_AJUSTE",
-            operacionLabel: r.motivo || "Movimiento de inventario",
-            tipoDoc: "01_FACTURA" as const,
-            docSerieNumero: `DOC-2026-${(1000 + idx).toString()}`,
-            entradaCant: isEntrada ? qty : undefined,
+            categoria: r.categoriaNombre || "General",
+            tipoOperacion,
+            operacionLabel: cleanMotivo || (isEntrada ? "Ingreso de Mercadería" : "Salida de Mercadería"),
+            tipoDoc,
+            docSerieNumero,
+            entradaCant: isEntrada ? absQty : undefined,
             entradaCostoUnit: isEntrada ? cost : undefined,
-            entradaTotal: isEntrada ? +(qty * cost).toFixed(2) : undefined,
-            salidaCant: !isEntrada ? qty : undefined,
+            entradaTotal: isEntrada ? +(absQty * cost).toFixed(2) : undefined,
+            salidaCant: !isEntrada ? absQty : undefined,
             salidaCostoUnit: !isEntrada ? cost : undefined,
-            salidaTotal: !isEntrada ? +(qty * cost).toFixed(2) : undefined,
-            saldoCant: 0,
+            salidaTotal: !isEntrada ? +(absQty * cost).toFixed(2) : undefined,
+            saldoCant: absQty,
             saldoCostoUnit: cost,
-            saldoTotal: 0,
+            saldoTotal: +(absQty * cost).toFixed(2),
           };
         });
       }
