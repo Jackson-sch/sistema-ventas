@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Archive,
   RefreshCw,
@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useQueryState, parseAsString } from "nuqs";
 import { getKardexMovementsData, getProductsData } from "@/actions/data-fetchers";
 import { KardexRecord } from "@/components/inventario/kardex/kardex-columns";
 import { KardexTable } from "@/components/inventario/kardex/kardex-table";
@@ -27,10 +26,10 @@ export default function KardexPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNewMovementOpen, setIsNewMovementOpen] = useState(false);
 
-  // URL state filters
-  const [selectedProduct, setSelectedProduct] = useQueryState("prod", parseAsString.withDefault("all"));
-  const [selectedOperation, setSelectedOperation] = useQueryState("op", parseAsString.withDefault("all"));
-  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
+  // Fast, instant local UI state for filter operations
+  const [selectedProduct, setSelectedProduct] = useState("all");
+  const [selectedOperation, setSelectedOperation] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const loadData = async (showToast = false) => {
     try {
@@ -64,25 +63,33 @@ export default function KardexPage() {
     loadData();
   }, []);
 
-  // Filtered dataset for KPI totals
-  const filtered = kardexRecords.filter((record) => {
-    const matchesProduct = selectedProduct === "all" || record.productoId === selectedProduct;
-    const matchesOp =
-      selectedOperation === "all" ||
-      (selectedOperation === "compra" && record.tipoOperacion === "02_COMPRA") ||
-      (selectedOperation === "venta" && record.tipoOperacion === "01_VENTA") ||
-      (selectedOperation === "transferencia" && record.tipoOperacion === "11_TRANSFERENCIA") ||
-      (selectedOperation === "merma" && (record.tipoOperacion === "13_MERMA" || record.tipoOperacion === "99_AJUSTE"));
-    const matchesSearch =
-      !searchTerm ||
-      record.productoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.docSerieNumero.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesProduct && matchesOp && matchesSearch;
-  });
+  // Filtered dataset memoized for KPI totals
+  const filteredRecords = useMemo(() => {
+    const q = (searchTerm || "").trim().toLowerCase();
+    return kardexRecords.filter((record) => {
+      const matchesProduct = selectedProduct === "all" || record.productoId === selectedProduct;
+      const matchesOp =
+        selectedOperation === "all" ||
+        (selectedOperation === "compra" && record.tipoOperacion === "02_COMPRA") ||
+        (selectedOperation === "venta" && record.tipoOperacion === "01_VENTA") ||
+        (selectedOperation === "transferencia" && record.tipoOperacion === "11_TRANSFERENCIA") ||
+        (selectedOperation === "merma" && (record.tipoOperacion === "13_MERMA" || record.tipoOperacion === "99_AJUSTE"));
+      const matchesSearch =
+        !q ||
+        record.productoNombre.toLowerCase().includes(q) ||
+        record.sku.toLowerCase().includes(q) ||
+        record.docSerieNumero.toLowerCase().includes(q);
+      return matchesProduct && matchesOp && matchesSearch;
+    });
+  }, [kardexRecords, selectedProduct, selectedOperation, searchTerm]);
 
-  const totalEntradasSoles = filtered.reduce((acc, r) => acc + (r.entradaTotal || 0), 0);
-  const totalSalidasSoles = filtered.reduce((acc, r) => acc + (r.salidaTotal || 0), 0);
+  const totalEntradasSoles = useMemo(() => {
+    return filteredRecords.reduce((acc, r) => acc + (r.entradaTotal || 0), 0);
+  }, [filteredRecords]);
+
+  const totalSalidasSoles = useMemo(() => {
+    return filteredRecords.reduce((acc, r) => acc + (r.salidaTotal || 0), 0);
+  }, [filteredRecords]);
 
   const handleExport = (format: "excel" | "sunat") => {
     toast.success(`Generando exportación de Kardex Valorado (${format.toUpperCase()})`, {
@@ -111,6 +118,7 @@ export default function KardexPage() {
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            type="button"
             onClick={() => loadData(true)}
             disabled={isRefreshing}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
@@ -126,12 +134,14 @@ export default function KardexPage() {
             <Package className="size-3.5 text-blue-400" /> Catálogo de Stock
           </Link>
           <button
+            type="button"
             onClick={() => handleExport("excel")}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="size-3.5 text-emerald-400" /> Excel
           </button>
           <button
+            type="button"
             onClick={() => setIsNewMovementOpen(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
@@ -144,7 +154,7 @@ export default function KardexPage() {
       <KardexKpis
         totalEntradasSoles={totalEntradasSoles}
         totalSalidasSoles={totalSalidasSoles}
-        totalMovimientos={filtered.length}
+        totalMovimientos={filteredRecords.length}
       />
 
       {/* Main Table Card (TanStack Table) */}

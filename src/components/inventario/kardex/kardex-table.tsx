@@ -1,15 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
-  getFilteredRowModel,
   flexRender,
   SortingState,
-  ColumnFiltersState,
 } from "@tanstack/react-table";
 import { Archive } from "lucide-react";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -31,44 +29,56 @@ export function KardexTable({
   const [sorting, setSorting] = useState<SortingState>([
     { id: "fecha", desc: true },
   ]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [pagination, setPagination] = useState({
-    pageIndex: 0,
-    pageSize: 10,
-  });
+  const [pageSize, setPageSize] = useState(10);
+  const [pageIndex, setPageIndex] = useState(0);
 
-  // Filter based on selectedProduct and selectedOperation before passing to tanstack or via custom filter
-  const filteredData = data.filter((record) => {
-    const matchesProduct = selectedProduct === "all" || record.productoId === selectedProduct;
-    const matchesOp =
-      selectedOperation === "all" ||
-      (selectedOperation === "compra" && record.tipoOperacion === "02_COMPRA") ||
-      (selectedOperation === "venta" && record.tipoOperacion === "01_VENTA") ||
-      (selectedOperation === "transferencia" && record.tipoOperacion === "11_TRANSFERENCIA") ||
-      (selectedOperation === "merma" && (record.tipoOperacion === "13_MERMA" || record.tipoOperacion === "99_AJUSTE"));
-    const matchesSearch =
-      !globalFilter ||
-      record.productoNombre.toLowerCase().includes(globalFilter.toLowerCase()) ||
-      record.sku.toLowerCase().includes(globalFilter.toLowerCase()) ||
-      record.docSerieNumero.toLowerCase().includes(globalFilter.toLowerCase());
-    return matchesProduct && matchesOp && matchesSearch;
-  });
+  // Memoize static columns to prevent TanStack re-parsing columns structure
+  const columns = useMemo(() => kardexColumns, []);
+
+  // Memoize filtered data
+  const filteredData = useMemo(() => {
+    const q = (globalFilter || "").trim().toLowerCase();
+    return data.filter((record) => {
+      const matchesProduct = selectedProduct === "all" || record.productoId === selectedProduct;
+      const matchesOp =
+        selectedOperation === "all" ||
+        (selectedOperation === "compra" && record.tipoOperacion === "02_COMPRA") ||
+        (selectedOperation === "venta" && record.tipoOperacion === "01_VENTA") ||
+        (selectedOperation === "transferencia" && record.tipoOperacion === "11_TRANSFERENCIA") ||
+        (selectedOperation === "merma" && (record.tipoOperacion === "13_MERMA" || record.tipoOperacion === "99_AJUSTE"));
+      const matchesSearch =
+        !q ||
+        record.productoNombre.toLowerCase().includes(q) ||
+        record.sku.toLowerCase().includes(q) ||
+        record.docSerieNumero.toLowerCase().includes(q);
+      return matchesProduct && matchesOp && matchesSearch;
+    });
+  }, [data, selectedProduct, selectedOperation, globalFilter]);
+
+  // Ensure pageIndex does not exceed available pages when filteredData shrinks
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const safePageIndex = Math.min(pageIndex, totalPages - 1);
+
+  const pagination = useMemo(
+    () => ({
+      pageIndex: safePageIndex,
+      pageSize,
+    }),
+    [safePageIndex, pageSize]
+  );
 
   const table = useReactTable({
     data: filteredData,
-    columns: kardexColumns,
+    columns,
     state: {
       sorting,
-      columnFilters,
       pagination,
     },
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
   });
 
   return (
@@ -97,7 +107,7 @@ export function KardexTable({
         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
           {table.getRowModel().rows.length === 0 ? (
             <tr>
-              <td colSpan={kardexColumns.length + 8} className="py-12 text-center text-slate-500 font-sans">
+              <td colSpan={20} className="py-12 text-center text-slate-500 font-sans">
                 <Archive className="size-8 mx-auto stroke-[1.2] opacity-30 text-slate-400 mb-2" />
                 <p className="text-sm font-semibold text-slate-400">
                   No se encontraron movimientos de Kardex
@@ -128,11 +138,14 @@ export function KardexTable({
 
       {/* Table Pagination Controller */}
       <TablePagination
-        currentPage={table.getState().pagination.pageIndex + 1}
+        currentPage={safePageIndex + 1}
         totalItems={filteredData.length}
-        pageSize={table.getState().pagination.pageSize}
-        onPageChange={(page) => table.setPageIndex(page - 1)}
-        onPageSizeChange={(size) => table.setPageSize(size)}
+        pageSize={pageSize}
+        onPageChange={(page) => setPageIndex(page - 1)}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPageIndex(0);
+        }}
       />
     </div>
   );
