@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { TransferRecord } from "@/actions/transfer-actions";
+import { SunatQrCode } from "@/components/ui/sunat-qr-code";
 
 interface GreTicketDialogProps {
   isOpen: boolean;
@@ -216,11 +217,21 @@ export function GreTicketDialog({
             </div>
 
             {/* QR Code Container */}
-            <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border border-slate-300">
-              <div className="w-20 h-20 bg-slate-900 text-white flex items-center justify-center rounded-lg p-1 text-[8px] font-mono text-center">
-                [QR FISCALIZACIÓN EN RUTA SUNAT]
-              </div>
-              <span className="text-[8px] text-slate-500 font-mono mt-1">Control en Ruta</span>
+            <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border border-slate-300 shadow-sm">
+              <SunatQrCode
+                value={
+                  transfer.qrString ||
+                  `20608945123|09|${transfer.codigoGuia.split("-")[0] || "T001"}|${transfer.codigoGuia.split("-")[1] || "00000001"}|20608945123|${transfer.fechaSalida}|${transfer.hashSunat}|`
+                }
+                size={84}
+                alt={`QR Fiscalización SUNAT GRE ${transfer.codigoGuia}`}
+              />
+              <span className="text-[8px] font-bold text-slate-800 font-mono mt-1 uppercase tracking-tight">
+                Control en Ruta
+              </span>
+              <span className="text-[7px] text-slate-500 font-mono">
+                SUNAT GRE
+              </span>
             </div>
           </div>
         </div>

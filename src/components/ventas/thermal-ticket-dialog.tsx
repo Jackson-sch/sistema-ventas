@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
+import { SunatQrCode } from "@/components/ui/sunat-qr-code";
 
 export interface TicketPaymentItem {
   medio: string;
@@ -245,8 +246,12 @@ export function ThermalTicketDialog({
             {/* Official SUNAT Footer & QR Representation */}
             <div className="pt-3 text-center space-y-2 text-[9px] text-slate-600">
               <div className="flex justify-center my-1">
-                <div className="p-1.5 bg-white border border-slate-300 rounded">
-                  <QrCode className="size-20 text-black stroke-[1.5]" />
+                <div className="p-1.5 bg-white border border-slate-300 rounded shadow-sm">
+                  <SunatQrCode
+                    value={`20608945123|${ticket.tipo === "Factura" ? "01" : ticket.tipo === "Nota de Crédito" ? "07" : "03"}|${ticket.comprobante.split("-")[0] || "B001"}|${ticket.comprobante.split("-")[1] || "00000001"}|${igv.toFixed(2)}|${totalAbs.toFixed(2)}|${ticket.fecha}|${ticket.cliente.documentoTipo === "RUC" ? "6" : "1"}|${ticket.cliente.documentoNumero}|${ticket.hashSunat}|`}
+                    size={80}
+                    alt={`QR SUNAT ${ticket.comprobante}`}
+                  />
                 </div>
               </div>
               <div className="font-mono font-semibold text-[8px] break-all text-slate-500">
