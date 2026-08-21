@@ -1,7 +1,37 @@
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { index, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { comprobanteEstadoSunatEnum, comprobanteTipoEnum } from "./enums";
 import { ventas } from "./ventas";
+import { tenants, sucursales, cajas } from "./tenants";
+
+/**
+ * Series y Correlativos tributarios por tipo de comprobante SUNAT / POS
+ */
+export const seriesComprobantes = pgTable(
+  "series_comprobantes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    sucursalId: uuid("sucursal_id").references(() => sucursales.id, { onDelete: "set null" }),
+    cajaId: uuid("caja_id").references(() => cajas.id, { onDelete: "set null" }),
+    tipoComprobante: varchar("tipo_comprobante", { length: 4 }).notNull(), // '01' (Factura), '03' (Boleta), '07' (NC), '08' (ND), '09' (Guía), 'COT' (Cotización)
+    tipoNombre: varchar("tipo_nombre", { length: 60 }).notNull(),
+    serie: varchar("serie", { length: 4 }).notNull(), // 'F001', 'B001', 'FC01', 'BC01', 'T001', 'COT1'
+    correlativoActual: integer("correlativo_actual").notNull().default(0),
+    correlativoInicial: integer("correlativo_inicial").notNull().default(1),
+    formato: varchar("formato", { length: 20 }).notNull().default("ticket_80mm"), // 'ticket_80mm', 'ticket_58mm', 'a4', 'a5'
+    esPrincipal: boolean("es_principal").notNull().default(true),
+    activo: boolean("activo").notNull().default(true),
+    creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
+    actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tenantTipoSerieIdx: uniqueIndex("series_tenant_tipo_serie_idx").on(t.tenantId, t.tipoComprobante, t.serie),
+    tenantIdx: index("series_tenant_idx").on(t.tenantId),
+  }),
+);
 
 /**
  * Comprobantes emitidos por venta. El POS no habla directo con

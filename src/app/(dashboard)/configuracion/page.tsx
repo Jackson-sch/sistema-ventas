@@ -31,9 +31,11 @@ import {
   testSunatConnectionAction,
   LiveEmissionResult,
 } from "@/actions/sunat-live-actions";
+import { SeriesManager } from "@/components/configuracion/series-manager";
+import { Hash } from "lucide-react";
 
 export default function ConfiguracionPage() {
-  const [activeTab, setActiveTab] = useState<"empresa" | "sunat" | "pos" | "puntos" | "database">("empresa");
+  const [activeTab, setActiveTab] = useState<"empresa" | "sunat" | "series" | "pos" | "puntos" | "database">("empresa");
 
   // Empresa form state
   const [ruc, setRuc] = useState("10737997630");
@@ -237,6 +239,17 @@ export default function ConfiguracionPage() {
           }`}
         >
           <Receipt className="size-4" /> Facturación SUNAT
+        </button>
+
+        <button
+          onClick={() => setActiveTab("series")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === "series"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+              : "text-slate-400 hover:text-white hover:bg-slate-900"
+          }`}
+        >
+          <Hash className="size-4" /> Series & Correlativos
         </button>
 
         <button
@@ -609,6 +622,13 @@ export default function ConfiguracionPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab: Series & Correlativos de Facturación */}
+      {activeTab === "series" && (
+        <div className="glass-panel rounded-3xl p-6 border border-slate-800/80 space-y-6 animate-in fade-in duration-150">
+          <SeriesManager />
         </div>
       )}
 

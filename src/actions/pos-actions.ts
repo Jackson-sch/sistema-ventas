@@ -5,6 +5,7 @@ import * as schema from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDevContext, ensureSesionAbierta } from "./context";
+import { getNextCorrelativoNumber } from "./series-actions";
 import { buildUblXml, SunatDocumentData } from "@/lib/sunat";
 import { TicketData } from "@/components/ventas/thermal-ticket-dialog";
 
@@ -66,11 +67,11 @@ export async function completeSaleTransactionAction(
     const igv = +(totalVenta - subtotalGravado).toFixed(2);
 
     const isFactura = input.docType === "factura";
-    const serie = isFactura ? "F001" : "B001";
-    const numeroConsecutivo = isFactura
-      ? 1205 + Math.floor(Math.random() * 50)
-      : 42920 + Math.floor(Math.random() * 100);
-    const serieNumero = `${serie}-${numeroConsecutivo.toString().padStart(8, "0")}`;
+    const tipoDocSunat = isFactura ? "01" : "03";
+    const correlativoInfo = await getNextCorrelativoNumber(tipoDocSunat, ctx.tenantId);
+    const serie = correlativoInfo.serie;
+    const numeroConsecutivo = correlativoInfo.numero;
+    const serieNumero = correlativoInfo.serieNumero;
 
     const fechaActual = new Date();
     const fechaEmisionStr = fechaActual.toISOString().split("T")[0];
