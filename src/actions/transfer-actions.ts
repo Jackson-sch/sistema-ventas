@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDevContext } from "./context";
 import { getNextCorrelativoNumber } from "./series-actions";
@@ -175,7 +175,7 @@ export async function createStockTransferAction(
             tenantId: ctx.tenantId,
             sucursalOrigenId: origenId,
             sucursalDestinoId: destinoId,
-            estado: "pendiente",
+            estado: "en_transito",
             solicitadoPor: ctx.cajeroId,
           } as any);
 
@@ -195,7 +195,12 @@ export async function createStockTransferAction(
                   stockActual: sql`${schema.inventario.stockActual} - ${item.cantidad}`,
                   actualizadoEn: new Date(),
                 })
-                .where(eq(schema.inventario.productoId, item.productoId));
+                .where(
+                  and(
+                    eq(schema.inventario.productoId, item.productoId),
+                    eq(schema.inventario.sucursalId, origenId)
+                  )
+                );
 
               // Kardex output log
               await tx.insert(schema.movimientosInventario).values({
@@ -205,6 +210,8 @@ export async function createStockTransferAction(
                 tipo: "transferencia_salida",
                 cantidad: (-item.cantidad).toString(),
                 motivo: `Traslado de Stock / GRE ${serieNumero} hacia ${input.sucursalDestinoNombre}`,
+                referenciaTipo: "transferencia",
+                referenciaId: transferId,
                 usuarioId: ctx.cajeroId,
               } as any);
             }
@@ -223,11 +230,16 @@ export async function createStockTransferAction(
               destino: input.sucursalDestinoNombre,
               bultos: totalBultos,
               peso_kgm: pesoTotal,
+              modalidad: input.modalidadTransporte,
+              chofer: input.conductor ? `${input.conductor.nombres} ${input.conductor.apellidos}` : undefined,
+              placa: input.vehiculo?.placa,
+              hashSunat: greResult.hash,
+              qrString: greResult.qrString,
             },
           });
         });
       } catch (dbErr) {
-        console.warn("DB Transaction fallback on transfer create:", dbErr);
+        console.error("Error en DB al guardar transferencia de stock:", dbErr);
       }
     }
 
@@ -365,16 +377,21 @@ const DEMO_TRANSFERS: TransferRecord[] = [
 export async function getStockTransfersAction(): Promise<TransferRecord[]> {
   try {
     if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
-      const [transfers, detalle, sucursales, productos] = await Promise.all([
+      const [transfers, detalle, sucursales, productos, auditRows] = await Promise.all([
         db.select().from(schema.transferenciasStock).orderBy(desc(schema.transferenciasStock.creadoEn)),
         db.select().from(schema.transferenciasStockDetalle),
         db.select().from(schema.sucursales),
         db.select().from(schema.productos),
+        db
+          .select()
+          .from(schema.auditoriaLog)
+          .where(eq(schema.auditoriaLog.tablaAfectada, "transferencias_stock")),
       ]);
 
       if (transfers && transfers.length > 0) {
         const sucursalMap = new Map(sucursales.map((s) => [s.id, s.nombre]));
         const prodMap = new Map(productos.map((p) => [p.id, p]));
+        const auditMap = new Map(auditRows.map((a) => [a.registroId, a.datosNuevos as any]));
 
         const detallePorTransfer = new Map<string, (typeof detalle)[number][]>();
         for (const d of detalle) {
@@ -384,8 +401,9 @@ export async function getStockTransfersAction(): Promise<TransferRecord[]> {
         }
 
         return transfers.map((t, idx) => {
-          const origen = sucursalMap.get(t.sucursalOrigenId) || "Sucursal Central - Surco";
-          const destino = sucursalMap.get(t.sucursalDestinoId) || "Sucursal San Isidro - Begonias";
+          const auditData = auditMap.get(t.id);
+          const origen = sucursalMap.get(t.sucursalOrigenId) || auditData?.origen || "Almacén Central (Surco)";
+          const destino = sucursalMap.get(t.sucursalDestinoId) || auditData?.destino || "Sucursal Destino";
           const itemsRaw = detallePorTransfer.get(t.id) ?? [];
           const fechaD = new Date(t.creadoEn);
 
@@ -396,28 +414,38 @@ export async function getStockTransfersAction(): Promise<TransferRecord[]> {
               sku: p?.sku || "SKU-001",
               nombre: p?.nombre || "Producto",
               cantidad: parseFloat(it.cantidad),
-              unidadMedida: p?.unidadMedida || "UND",
+              unidadMedida: p?.tipo === "peso" ? "kg" : "und",
             };
           });
 
-          const totalBultos = items.length || 1;
-          const pesoTotal = items.reduce((acc, it) => acc + it.cantidad * 0.5, 0) || 50;
+          const totalBultos = auditData?.bultos || items.length || 1;
+          const pesoTotal = auditData?.peso_kgm || items.reduce((acc, it) => acc + it.cantidad * 0.5, 0) || 1;
+          const codigoGuia = auditData?.guia_remision || `T001-${String(transfers.length - idx).padStart(8, "0")}`;
+          const hashSunat = auditData?.hashSunat || "q7E4u9Yx1P3a8B2=";
+          const qrString =
+            auditData?.qrString ||
+            `20608945123|09|${codigoGuia.split("-")[0]}|${codigoGuia.split("-")[1] || "00000001"}|20608945123|${fechaD.toISOString().slice(0, 10)}|${hashSunat}|`;
 
           return {
             id: t.id,
-            codigoGuia: `T001-${String(12 + idx).padStart(8, "0")}`,
+            codigoGuia,
             sucursalOrigen: origen,
             sucursalDestino: destino,
-            estado: t.estado === "recibida" ? "completada" : t.estado === "en_transito" ? "en_transito" : "cancelada",
+            estado:
+              t.estado === "recibida"
+                ? "completada"
+                : t.estado === "cancelada"
+                ? "cancelada"
+                : "en_transito",
             fechaSalida: fechaD.toLocaleDateString("es-PE"),
             horaSalida: fechaD.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
-            pesoBrutoKgm: +pesoTotal.toFixed(2),
+            pesoBrutoKgm: +Number(pesoTotal).toFixed(2),
             totalBultos,
-            modalidadTransporte: "02" as const,
-            choferNombre: "Esteban Vega (Encargado Logística)",
-            vehiculoPlaca: "ABC-123",
-            hashSunat: "q7E4u9Yx1P3a8B2=",
-            qrString: `20608912345|09|T001|${String(12 + idx).padStart(8, "0")}|20608912345|${fechaD.toISOString().slice(0, 10)}|`,
+            modalidadTransporte: (auditData?.modalidad as any) || "02",
+            choferNombre: auditData?.chofer || "Jorge Huamán Díaz",
+            vehiculoPlaca: auditData?.placa || "ABC-123",
+            hashSunat,
+            qrString,
             items,
           };
         });
