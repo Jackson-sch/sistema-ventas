@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition, useMemo } from "react";
 import {
   ShoppingCart,
   Plus,
@@ -12,6 +12,11 @@ import {
   X,
   Loader2,
   Building2,
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  DollarSign,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -30,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface SupplierItem {
   id: string;
@@ -53,6 +59,17 @@ export function OrdenesFormDialog({
   availableSuppliers,
   onSuccess,
 }: OrdenesFormDialogProps) {
+  // Deduplicate suppliers strictly by RUC
+  const uniqueSuppliers = useMemo(() => {
+    const seen = new Set<string>();
+    return availableSuppliers.filter((s) => {
+      const key = (s.ruc || s.id || s.razonSocial).trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [availableSuppliers]);
+
   // Form State
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [supplierRuc, setSupplierRuc] = useState("");
@@ -63,7 +80,7 @@ export function OrdenesFormDialog({
   const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>("CREDITO_30D");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [currency, setCurrency] = useState<"PEN" | "USD">("PEN");
-  const [observaciones, setObservaciones] = useState("Entrega regular en muelle de almacén.");
+  const [observaciones, setObservaciones] = useState("Entrega regular en muelle de recepción de almacén.");
   const [items, setItems] = useState<
     {
       productoId: string;
@@ -118,8 +135,8 @@ export function OrdenesFormDialog({
   // Reset on open
   useEffect(() => {
     if (isOpen) {
-      if (availableSuppliers.length > 0) {
-        const s = availableSuppliers[0];
+      if (uniqueSuppliers.length > 0) {
+        const s = uniqueSuppliers[0];
         setSelectedSupplierId(s.id);
         setSupplierName(s.razonSocial);
         setSupplierRuc(s.ruc);
@@ -137,7 +154,7 @@ export function OrdenesFormDialog({
 
       setPaymentCondition("CREDITO_30D");
       setCurrency("PEN");
-      setObservaciones("Entrega regular en muelle de recepción.");
+      setObservaciones("Entrega regular en muelle de recepción de almacén.");
       setItems([]);
       setSelectedProd(null);
       setInputQty("10");
@@ -154,11 +171,11 @@ export function OrdenesFormDialog({
         setSearchResults(initial);
       });
     }
-  }, [isOpen, availableSuppliers]);
+  }, [isOpen, uniqueSuppliers]);
 
   const handleSupplierSelect = (id: string) => {
     setSelectedSupplierId(id);
-    const sup = availableSuppliers.find((s) => s.id === id);
+    const sup = uniqueSuppliers.find((s) => s.id === id);
     if (sup) {
       setSupplierName(sup.razonSocial);
       setSupplierRuc(sup.ruc);
@@ -276,7 +293,7 @@ export function OrdenesFormDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl glass-panel rounded-3xl p-6 shadow-2xl border border-slate-700/80 space-y-5 bg-[hsl(224,71%,4%)] max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-3xl glass-panel rounded-3xl p-6 shadow-2xl border border-slate-700/80 space-y-5 bg-[hsl(224,71%,4%)] max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-3">
@@ -284,11 +301,14 @@ export function OrdenesFormDialog({
               <ShoppingCart className="size-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white tracking-tight">
+              <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 Nueva Orden de Compra a Proveedor
+                <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-400 text-[10px] font-mono">
+                  B2B
+                </Badge>
               </h3>
               <p className="text-xs text-slate-400">
-                Emisión de pedido formal y abastecimiento de almacén
+                Emisión de pedido formal, abastecimiento y recepción en muelle de almacén
               </p>
             </div>
           </div>
@@ -302,27 +322,35 @@ export function OrdenesFormDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Supplier Selection */}
+          {/* Supplier Selection Card */}
           <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                 <Building2 className="size-3.5" /> Datos del Proveedor
               </span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {uniqueSuppliers.length} proveedores registrados
+              </span>
             </div>
 
-            {availableSuppliers.length > 0 && (
+            {uniqueSuppliers.length > 0 && (
               <div>
                 <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
                   Seleccionar del Directorio de Proveedores
                 </label>
                 <Select value={selectedSupplierId} onValueChange={handleSupplierSelect}>
-                  <SelectTrigger className="w-full h-9 rounded-xl bg-slate-900 border-slate-700 text-xs text-white focus:ring-1 focus:ring-amber-500">
+                  <SelectTrigger className="w-full h-10 rounded-xl bg-slate-900 border-slate-700 text-xs text-white focus:ring-1 focus:ring-amber-500 font-semibold">
                     <SelectValue placeholder="Seleccione un proveedor..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-50">
-                    {availableSuppliers.map((s) => (
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-50 max-h-60">
+                    {uniqueSuppliers.map((s) => (
                       <SelectItem key={s.id} value={s.id} className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                        {s.razonSocial} (RUC: {s.ruc})
+                        <div className="flex items-center justify-between gap-3 w-full">
+                          <span className="font-bold">{s.razonSocial}</span>
+                          <span className="text-slate-400 font-mono text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded">
+                            RUC: {s.ruc}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -330,7 +358,7 @@ export function OrdenesFormDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
                 <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
                   RUC del Proveedor
@@ -340,7 +368,7 @@ export function OrdenesFormDialog({
                   value={supplierRuc}
                   onChange={(e) => setSupplierRuc(e.target.value)}
                   placeholder="20XXXXXXXXX"
-                  className="w-full h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                  className="w-full h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono font-bold"
                   required
                 />
               </div>
@@ -353,8 +381,42 @@ export function OrdenesFormDialog({
                   value={supplierName}
                   onChange={(e) => setSupplierName(e.target.value)}
                   placeholder="Nombre de la empresa"
-                  className="w-full h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   required
+                />
+              </div>
+            </div>
+
+            {/* Optional Supplier Contacts Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-[11px]">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
+                <User className="size-3 text-slate-500 shrink-0" />
+                <input
+                  type="text"
+                  value={supplierContact}
+                  onChange={(e) => setSupplierContact(e.target.value)}
+                  placeholder="Contacto Comercial"
+                  className="bg-transparent border-none outline-none w-full text-xs placeholder:text-slate-600"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
+                <Phone className="size-3 text-slate-500 shrink-0" />
+                <input
+                  type="text"
+                  value={supplierPhone}
+                  onChange={(e) => setSupplierPhone(e.target.value)}
+                  placeholder="Teléfono"
+                  className="bg-transparent border-none outline-none w-full text-xs font-mono placeholder:text-slate-600"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
+                <Mail className="size-3 text-slate-500 shrink-0" />
+                <input
+                  type="email"
+                  value={supplierEmail}
+                  onChange={(e) => setSupplierEmail(e.target.value)}
+                  placeholder="Email Pedidos"
+                  className="bg-transparent border-none outline-none w-full text-xs placeholder:text-slate-600"
                 />
               </div>
             </div>
@@ -408,22 +470,28 @@ export function OrdenesFormDialog({
 
             <div>
               <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
-                Fecha Estimada Entrega
+                Fecha Estimada de Entrega
               </label>
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
-                required
-              />
+              <div className="relative">
+                <Calendar className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                  required
+                />
+              </div>
             </div>
           </div>
 
           {/* Product Picker Section */}
           <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-              Agregar Productos al Pedido
+            <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between">
+              <span>Agregar Productos al Pedido</span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {items.length} ítems en orden
+              </span>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -452,7 +520,7 @@ export function OrdenesFormDialog({
                         setIsDropdownOpen(true);
                       }}
                       onFocus={() => setIsDropdownOpen(true)}
-                      placeholder="Buscar producto por nombre o SKU..."
+                      placeholder="Buscar producto por nombre, SKU o código de barras..."
                       className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
                     />
                     {isSearching ? (
@@ -468,7 +536,7 @@ export function OrdenesFormDialog({
                   <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 shadow-2xl z-50 divide-y divide-slate-800">
                     {searchResults.length === 0 ? (
                       <div className="p-3 text-center text-xs text-slate-500 font-sans">
-                        {isSearching ? "Buscando..." : "No se encontraron productos"}
+                        {isSearching ? "Buscando en catálogo..." : "No se encontraron productos"}
                       </div>
                     ) : (
                       searchResults.map((prod) => (
@@ -481,7 +549,7 @@ export function OrdenesFormDialog({
                           <div className="min-w-0">
                             <div className="font-bold text-white truncate">{prod.nombre}</div>
                             <div className="text-[10px] text-slate-400 font-mono">
-                              SKU: {prod.sku} • Stock actual: {prod.stock} {prod.tipoVenta === "peso" ? "kg" : "und"}
+                              SKU: {prod.sku} • Stock: {prod.stock} {prod.tipoVenta === "peso" ? "kg" : "und"}
                             </div>
                           </div>
                           <div className="font-mono text-amber-400 text-xs shrink-0">
@@ -521,7 +589,7 @@ export function OrdenesFormDialog({
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="h-9 px-3.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                className="h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-amber-600/20"
               >
                 <Plus className="size-3.5" /> Agregar
               </button>
@@ -533,29 +601,29 @@ export function OrdenesFormDialog({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400">
                     <tr>
-                      <th className="py-2 px-3">Producto</th>
-                      <th className="py-2 px-3 text-center">Cant.</th>
-                      <th className="py-2 px-3 text-right">Costo U.</th>
-                      <th className="py-2 px-3 text-right">Total</th>
-                      <th className="py-2 px-2 text-center">Quitar</th>
+                      <th className="py-2.5 px-3">Producto</th>
+                      <th className="py-2.5 px-3 text-center">Cant. Pedida</th>
+                      <th className="py-2.5 px-3 text-right">Costo Unitario</th>
+                      <th className="py-2.5 px-3 text-right">Total</th>
+                      <th className="py-2.5 px-2 text-center">Quitar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
                     {items.map((item) => (
                       <tr key={item.productoId} className="hover:bg-slate-900/30">
-                        <td className="py-2 px-3 text-white font-sans font-medium">
+                        <td className="py-2.5 px-3 text-white font-sans font-medium">
                           {item.nombre} <span className="text-slate-500 text-[10px]">({item.sku})</span>
                         </td>
-                        <td className="py-2 px-3 text-center text-amber-400 font-bold">
+                        <td className="py-2.5 px-3 text-center text-amber-400 font-bold">
                           {item.cantidadPedida}
                         </td>
-                        <td className="py-2 px-3 text-right text-slate-300">
+                        <td className="py-2.5 px-3 text-right text-slate-300">
                           {formatCurrency(item.costoUnitario)}
                         </td>
-                        <td className="py-2 px-3 text-right text-white font-bold">
+                        <td className="py-2.5 px-3 text-right text-white font-bold">
                           {formatCurrency(item.total)}
                         </td>
-                        <td className="py-2 px-2 text-center">
+                        <td className="py-2.5 px-2 text-center">
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.productoId)}
@@ -573,13 +641,17 @@ export function OrdenesFormDialog({
           </div>
 
           {/* Totals Summary Card */}
-          <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-400">
-              Subtotal: {formatCurrency(subtotal)} • IGV (18%): {formatCurrency(igv)}
-            </span>
-            <span className="text-base font-extrabold text-amber-400">
-              Total: {formatCurrency(total)}
-            </span>
+          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-4 text-slate-400">
+              <span>Subtotal: <strong className="text-slate-200">{currency === "USD" ? "$ " : "S/ "}{subtotal.toFixed(2)}</strong></span>
+              <span>IGV (18%): <strong className="text-slate-200">{currency === "USD" ? "$ " : "S/ "}{igv.toFixed(2)}</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 uppercase text-[10px] font-bold">Total a Facturar:</span>
+              <span className="text-lg font-extrabold text-amber-400">
+                {currency === "USD" ? "$ " : "S/ "}{total.toFixed(2)}
+              </span>
+            </div>
           </div>
 
           {/* Observations */}

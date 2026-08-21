@@ -601,7 +601,17 @@ export async function getSuppliersData() {
           totalPorProveedor.set(o.proveedorId, (totalPorProveedor.get(o.proveedorId) ?? 0) + total);
         }
 
-        return proveedoresRows.map((p) => ({
+        // Deduplicate rows by RUC
+        const seenRuc = new Set<string>();
+        const uniqueProvs = proveedoresRows.filter((p) => {
+          if (!p.ruc || seenRuc.has(p.ruc)) return false;
+          seenRuc.add(p.ruc);
+          return true;
+        });
+
+        uniqueProvs.sort((a, b) => a.razonSocial.localeCompare(b.razonSocial));
+
+        return uniqueProvs.map((p) => ({
           id: p.id,
           ruc: p.ruc,
           razonSocial: p.razonSocial,
