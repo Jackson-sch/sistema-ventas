@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Package,
   Search,
@@ -228,12 +229,12 @@ export default function InventarioPage() {
           >
             <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin text-blue-400" : ""}`} />
           </button>
-          <button
-            onClick={() => products.length > 0 && handleOpenKardex(products[0])}
+          <Link
+            href="/inventario/kardex"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold hover:border-slate-700 transition-colors"
           >
             <Archive className="size-3.5 text-blue-400" /> Kardex General
-          </button>
+          </Link>
           <button
             onClick={handleOpenNew}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-95"
@@ -375,13 +376,13 @@ export default function InventarioPage() {
                   </td>
                   <td className="py-3 px-4 text-center">
                     <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => handleOpenKardex(prod)}
-                        title="Ver Kardex"
-                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors"
+                      <Link
+                        href={`/inventario/kardex?prod=${prod.id}`}
+                        title="Ver Kardex del Producto"
+                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors inline-flex items-center justify-center"
                       >
                         <Archive className="size-3.5" />
-                      </button>
+                      </Link>
                       <button
                         onClick={() => handleOpenEdit(prod)}
                         title="Editar Producto"

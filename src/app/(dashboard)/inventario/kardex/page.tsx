@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { getKardexMovementsData } from "@/actions/data-fetchers";
 import { KardexRecord } from "@/components/inventario/kardex/kardex-columns";
 import { KardexTable } from "@/components/inventario/kardex/kardex-table";
@@ -18,15 +19,16 @@ import { KardexKpis } from "@/components/inventario/kardex/kardex-kpis";
 import { KardexMovementDialog } from "@/components/inventario/kardex/kardex-movement-dialog";
 
 export default function KardexPage() {
+  const searchParams = useSearchParams();
   const [kardexRecords, setKardexRecords] = useState<KardexRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNewMovementOpen, setIsNewMovementOpen] = useState(false);
 
-  // Fast, instant local UI state for filter operations
-  const [selectedProduct, setSelectedProduct] = useState("all");
-  const [selectedOperation, setSelectedOperation] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
+  // Fast, instant local UI state for filter operations initialized from URL params if present
+  const [selectedProduct, setSelectedProduct] = useState(searchParams.get("prod") || "all");
+  const [selectedOperation, setSelectedOperation] = useState(searchParams.get("op") || "all");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
 
   const loadData = async (showToast = false) => {
     try {
