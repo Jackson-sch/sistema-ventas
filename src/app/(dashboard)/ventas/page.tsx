@@ -117,9 +117,9 @@ export default function VentasPage() {
       s.cajero.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDoc =
       filterDoc === "all" ||
-      (filterDoc === "boletas" && s.tipo === "Boleta") ||
-      (filterDoc === "facturas" && s.tipo === "Factura") ||
-      (filterDoc === "notas_credito" && s.tipo === "Nota de Crédito");
+      ((filterDoc === "boleta" || filterDoc === "boletas") && s.tipo === "Boleta") ||
+      ((filterDoc === "factura" || filterDoc === "facturas") && s.tipo === "Factura") ||
+      ((filterDoc === "nc" || filterDoc === "notas_credito") && s.tipo === "Nota de Crédito");
     return matchesSearch && matchesDoc;
   });
 

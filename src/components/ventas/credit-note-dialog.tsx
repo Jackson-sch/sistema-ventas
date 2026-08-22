@@ -15,6 +15,7 @@ import {
   DollarSign,
   Plus,
   Minus,
+  Banknote,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -23,6 +24,13 @@ import {
   emitCreditNoteAction,
   CreditNoteItemInput,
 } from "@/actions/credit-note-actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface SaleItemForReturn {
   id: string;
@@ -238,24 +246,31 @@ export function CreditNoteDialog({
             <label className="text-xs font-bold text-slate-300">
               Tipo de Motivo / Discrepancia SUNAT (Catálogo 09):
             </label>
-            <select
+            <Select
               value={motivoCodigo}
-              onChange={(e) => {
-                const code = e.target.value as any;
-                setMotivoCodigo(code);
-                const found = SUNAT_MOTIVOS.find((m) => m.code === code);
+              onValueChange={(val: any) => {
+                setMotivoCodigo(val);
+                const found = SUNAT_MOTIVOS.find((m) => m.code === val);
                 if (found) {
                   setMotivoDescripcion(found.label.split("- ")[1] || "");
                 }
               }}
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500 font-medium"
             >
-              {SUNAT_MOTIVOS.map((m) => (
-                <option key={m.code} value={m.code}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950/90 border-slate-800 text-xs text-white focus:ring-1 focus:ring-rose-500 font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50">
+                {SUNAT_MOTIVOS.map((m) => (
+                  <SelectItem
+                    key={m.code}
+                    value={m.code}
+                    className="text-xs cursor-pointer focus:bg-rose-600/20 focus:text-rose-300"
+                  >
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Sustento del motivo (obligatorio por SUNAT) */}
@@ -363,8 +378,9 @@ export function CreditNoteDialog({
                 onChange={(e) => setReingresarStock(e.target.checked)}
                 className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
               />
-              <span className="text-slate-300 font-medium">
-                📦 Reingresar mercadería al <strong>Inventario & Kardex</strong>
+              <span className="text-slate-300 font-medium flex items-center gap-1.5">
+                <PackageCheck className="size-3.5 text-emerald-400 shrink-0" />
+                <span>Reingresar mercadería al <strong>Inventario & Kardex</strong></span>
               </span>
             </label>
 
@@ -375,8 +391,9 @@ export function CreditNoteDialog({
                 onChange={(e) => setReintegrarEfectivo(e.target.checked)}
                 className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
               />
-              <span className="text-slate-300 font-medium">
-                💵 Registrar egreso de efectivo en <strong>Gaveta de Caja</strong>
+              <span className="text-slate-300 font-medium flex items-center gap-1.5">
+                <Banknote className="size-3.5 text-emerald-400 shrink-0" />
+                <span>Registrar egreso de efectivo en <strong>Gaveta de Caja</strong></span>
               </span>
             </label>
           </div>
