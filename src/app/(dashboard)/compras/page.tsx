@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Truck,
   Building2,
@@ -169,12 +170,12 @@ export default function ComprasPage() {
           >
             <Building2 className="size-3.5 text-blue-400" /> Nuevo Proveedor
           </button>
-          <button
-            onClick={() => setIsPurchaseOpen(true)}
+          <Link
+            href="/compras/nueva"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition-all hover:scale-[1.02] active:scale-95"
           >
             <PackageCheck className="size-3.5" /> Ingresar Mercadería / Factura
-          </button>
+          </Link>
         </div>
       </div>
 
