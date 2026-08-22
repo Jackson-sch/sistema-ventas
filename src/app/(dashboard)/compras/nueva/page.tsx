@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { getSuppliersData } from "@/actions/data-fetchers";
 import { registerDirectPurchaseAction } from "@/actions/purchase-order-actions";
+import { getSeriesComprobantesData, SerieItem } from "@/actions/series-actions";
 import { SupplierData } from "@/components/compras/supplier-form-dialog";
 import { PurchaseInvoiceHeader } from "@/components/compras/nueva/purchase-invoice-header";
 import { PurchaseProductScanner } from "@/components/compras/nueva/purchase-product-scanner";
@@ -22,11 +23,12 @@ import { PurchaseSummarySidebar } from "@/components/compras/nueva/purchase-summ
 export default function NuevaCompraPage() {
   const router = useRouter();
   const [suppliers, setSuppliers] = useState<SupplierData[]>([]);
+  const [seriesList, setSeriesList] = useState<SerieItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State
-  const [invoiceNumber, setInvoiceNumber] = useState(`F001-00${Math.floor(100000 + Math.random() * 900000)}`);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [paymentCondition, setPaymentCondition] = useState("Crédito 30 días");
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
@@ -35,22 +37,28 @@ export default function NuevaCompraPage() {
   const [items, setItems] = useState<PurchaseItemRow[]>([]);
 
   useEffect(() => {
-    async function loadSuppliers() {
+    async function loadData() {
       try {
-        const data = await getSuppliersData();
-        if (data) {
-          setSuppliers(data as SupplierData[]);
-          if (data.length > 0) {
-            setSelectedSupplierId(data[0].id);
+        const [sups, series] = await Promise.all([
+          getSuppliersData(),
+          getSeriesComprobantesData(),
+        ]);
+        if (sups) {
+          setSuppliers(sups as SupplierData[]);
+          if (sups.length > 0) {
+            setSelectedSupplierId(sups[0].id);
           }
         }
+        if (series) {
+          setSeriesList(series);
+        }
       } catch {
-        toast.error("Error al cargar proveedores.");
+        toast.error("Error al cargar proveedores y series.");
       } finally {
         setIsLoading(false);
       }
     }
-    loadSuppliers();
+    loadData();
   }, []);
 
   const selectedSupplier = useMemo(() => {
@@ -200,6 +208,7 @@ export default function NuevaCompraPage() {
             selectedSupplierId={selectedSupplierId}
             onSupplierChange={setSelectedSupplierId}
             suppliers={suppliers}
+            seriesList={seriesList}
             paymentCondition={paymentCondition}
             onPaymentConditionChange={setPaymentCondition}
             issueDate={issueDate}
