@@ -365,39 +365,7 @@ export const superadminNavigationGroups: NavGroup[] = [
         title: "Simulador de Venta (Dev)",
         url: "/dev/venta-test",
         icon: FlaskConical,
-      },
-    ],
-  },
-  {
-    label: "Acceso a Tiendas & Sucursales",
-    items: [
-      {
-        title: "Panel Ejecutivo Tienda",
-        url: "/dashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "Terminal POS",
-        url: "/pos",
-        icon: ShoppingCart,
-        badge: "En Vivo",
-        badgeVariant: "success",
-      },
-      {
-        title: "Sucursales & Cajas",
-        url: "/sucursales",
-        icon: Store,
-      },
-      {
-        title: "Usuarios & Roles",
-        url: "/usuarios",
-        icon: Users2,
-      },
-      {
-        title: "Libros SUNAT SIRE",
-        url: "/reportes/sire",
-        icon: FileSpreadsheet,
-        badge: "14.1 / 8.1",
+        badge: "Test",
         badgeVariant: "default",
       },
     ],
