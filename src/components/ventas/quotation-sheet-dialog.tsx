@@ -46,12 +46,12 @@ export function QuotationSheetDialog({
       .map((i) => `• ${i.cantidad} ${i.tipo === "peso" ? "kg" : "und"} ${i.nombre} - S/ ${i.total.toFixed(2)}`)
       .join("\n");
 
-    const message = `Hola *${quotation.clienteNombre}*, le compartimos su Cotización Oficial de *NovaMarket Supermercados*:\n\n` +
-      `📄 *N° Proforma:* ${quotation.codigo}\n` +
-      `📅 *Emisión:* ${quotation.fechaEmision} | *Válida hasta:* ${quotation.fechaVencimiento}\n\n` +
+    const message = `Estimado(a) *${quotation.clienteNombre}*, le compartimos su Cotización Oficial de *NovaMarket Supermercados*:\n\n` +
+      `*N° Proforma:* ${quotation.codigo}\n` +
+      `*Emisión:* ${quotation.fechaEmision} | *Válida hasta:* ${quotation.fechaVencimiento}\n\n` +
       `*Detalle de Productos:*\n${itemsText}\n\n` +
-      `💰 *TOTAL A PAGAR:* S/ ${quotation.total.toFixed(2)} (Incluye IGV)\n\n` +
-      `Puede acercarse a cualquiera de nuestras cajas o confirmar su pedido respondiendo este mensaje. ¡Muchas gracias!`;
+      `*TOTAL A PAGAR:* S/ ${quotation.total.toFixed(2)} (Incluye IGV)\n\n` +
+      `Puede acercarse a cualquiera de nuestras cajas o confirmar su pedido respondiendo a este mensaje.`;
 
     const targetUrl = phone
       ? `https://wa.me/51${phone}?text=${encodeURIComponent(message)}`

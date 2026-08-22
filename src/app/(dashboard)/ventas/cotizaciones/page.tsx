@@ -39,6 +39,13 @@ import {
   QuotationItem,
 } from "@/actions/quotation-actions";
 import { getProductsData, getClientsData } from "@/actions/data-fetchers";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CotizacionesPage() {
   const router = useRouter();
@@ -576,32 +583,44 @@ export default function CotizacionesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-slate-400 font-bold">Cliente Frecuente (Opcional):</label>
-                  <select
-                    value={selectedClientId}
-                    onChange={(e) => handleClientSelect(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
-                  >
-                    <option value="">-- Seleccionar o escribir manual --</option>
-                    {availableClients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} ({c.numDoc})
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={selectedClientId} onValueChange={handleClientSelect}>
+                    <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950 border-slate-800 text-xs text-white focus:ring-1 focus:ring-blue-500">
+                      <SelectValue placeholder="-- Seleccionar o escribir manual --" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-[10000] max-h-60">
+                      {availableClients.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className="font-bold">{c.nombre}</span>
+                            <span className="text-slate-400 font-mono text-[10px]">({c.numDoc})</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-slate-400 font-bold">Días de Validez / Vigencia:</label>
-                  <select
-                    value={validityDays}
-                    onChange={(e) => setValidityDays(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
-                  >
-                    <option value={3}>3 días calendario</option>
-                    <option value={7}>7 días calendario (Recomendado)</option>
-                    <option value={15}>15 días calendario</option>
-                    <option value={30}>30 días calendario</option>
-                  </select>
+                  <Select value={String(validityDays)} onValueChange={(v) => setValidityDays(Number(v))}>
+                    <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950 border-slate-800 text-xs text-white focus:ring-1 focus:ring-blue-500">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-[10000]">
+                      <SelectItem value="3" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        3 días calendario
+                      </SelectItem>
+                      <SelectItem value="7" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        7 días calendario (Recomendado)
+                      </SelectItem>
+                      <SelectItem value="15" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        15 días calendario
+                      </SelectItem>
+                      <SelectItem value="30" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        30 días calendario
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -609,14 +628,19 @@ export default function CotizacionesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-slate-400 font-bold">Tipo Doc:</label>
-                  <select
-                    value={clientTypeDoc}
-                    onChange={(e) => setClientTypeDoc(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
-                  >
-                    <option value="DNI">DNI (Persona)</option>
-                    <option value="RUC">RUC (Empresa)</option>
-                  </select>
+                  <Select value={clientTypeDoc} onValueChange={(v: any) => setClientTypeDoc(v)}>
+                    <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950 border-slate-800 text-xs text-white focus:ring-1 focus:ring-blue-500">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-[10000]">
+                      <SelectItem value="DNI" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        DNI (Persona)
+                      </SelectItem>
+                      <SelectItem value="RUC" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        RUC (Empresa)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-slate-400 font-bold">Número de Doc:</label>
@@ -625,7 +649,7 @@ export default function CotizacionesPage() {
                     value={clientDoc}
                     onChange={(e) => setClientDoc(e.target.value)}
                     placeholder="Ej: 20601234567"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono"
+                    className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                     required
                   />
                 </div>
@@ -636,7 +660,7 @@ export default function CotizacionesPage() {
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Ej: Inversiones Retail SAC"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
+                    className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                     required
                   />
                 </div>
@@ -648,24 +672,31 @@ export default function CotizacionesPage() {
                   Agregar Ítems a la Proforma:
                 </span>
                 <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    className="flex-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
-                  >
-                    <option value="">-- Seleccionar Producto del Catálogo --</option>
-                    {catalogProducts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre} — S/ {p.precioVenta.toFixed(2)} ({p.sku})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex-1 w-full">
+                    <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                      <SelectTrigger className="w-full h-10 rounded-xl bg-slate-900 border-slate-700 text-xs text-white focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder="-- Seleccionar Producto del Catálogo --" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-[10000] max-h-60">
+                        {catalogProducts.map((p) => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                            <div className="flex items-center justify-between gap-3 w-full">
+                              <span className="font-bold">{p.nombre}</span>
+                              <span className="text-emerald-400 font-mono text-[11px] font-bold">
+                                {formatCurrency(p.precioVenta)}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <input
                     type="number"
                     min={1}
                     value={selectedProductQty}
                     onChange={(e) => setSelectedProductQty(Number(e.target.value))}
-                    className="w-20 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-center font-mono"
+                    className="w-20 h-10 px-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-center font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <button
                     type="button"
