@@ -355,30 +355,11 @@ export const superadminNavigationGroups: NavGroup[] = [
         badgeVariant: "default",
       },
       {
-        title: "Empresas & Tenants",
-        url: "/superadmin",
-        icon: Building2,
-        badge: "Multi-Store",
-        badgeVariant: "default",
-      },
-      {
         title: "Auditoría de Seguridad",
         url: "/auditoria",
         icon: ShieldCheck,
         badge: "Logs",
         badgeVariant: "default",
-      },
-    ],
-  },
-  {
-    label: "Infraestructura & Sistema",
-    items: [
-      {
-        title: "Telemetría SUNAT & DB",
-        url: "/superadmin",
-        icon: Activity,
-        badge: "99.98%",
-        badgeVariant: "success",
       },
       {
         title: "Simulador de Venta (Dev)",
@@ -399,6 +380,8 @@ export const superadminNavigationGroups: NavGroup[] = [
         title: "Terminal POS",
         url: "/pos",
         icon: ShoppingCart,
+        badge: "En Vivo",
+        badgeVariant: "success",
       },
       {
         title: "Sucursales & Cajas",
@@ -406,9 +389,16 @@ export const superadminNavigationGroups: NavGroup[] = [
         icon: Store,
       },
       {
-        title: "Usuarios & Permisos",
+        title: "Usuarios & Roles",
         url: "/usuarios",
         icon: Users2,
+      },
+      {
+        title: "Libros SUNAT SIRE",
+        url: "/reportes/sire",
+        icon: FileSpreadsheet,
+        badge: "14.1 / 8.1",
+        badgeVariant: "default",
       },
     ],
   },

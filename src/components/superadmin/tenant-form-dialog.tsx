@@ -12,10 +12,19 @@ import {
   User,
   MapPin,
   FileText,
+  X,
+  Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 import { lookupIdentityAction } from "@/actions/identity-lookup";
 import { createTenantAction, CreateTenantInput, TenantSummary } from "@/actions/superadmin-actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TenantFormDialogProps {
   isOpen: boolean;
@@ -92,7 +101,7 @@ export function TenantFormDialog({
 
       const res = await createTenantAction(payload);
       if (res.success && res.tenant) {
-        toast.success(`¡Empresa ${res.tenant.nombreComercial} aprovisionada exitosamente!`, {
+        toast.success(`Empresa ${res.tenant.nombreComercial} aprovisionada exitosamente.`, {
           description: `Plan: ${plan.toUpperCase()} • Sucursal y usuario admin creados.`,
         });
         onSuccess(res.tenant);
@@ -109,182 +118,198 @@ export function TenantFormDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-xl bg-[hsl(224,71%,4%)] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 my-auto max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-xl bg-slate-900/95 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 my-auto max-h-[92vh] overflow-y-auto relative">
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-5 top-5 p-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+        >
+          <X className="size-4" />
+        </button>
+
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Building2 className="size-5" />
-            </div>
-            <div>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-950/80 text-blue-400 text-[10px] font-bold border border-blue-800/50">
-                SaaS Multi-Tenant
-              </span>
-              <h3 className="text-base font-extrabold text-white tracking-tight mt-0.5">
-                Aprovisionar Nueva Empresa / Tenant
-              </h3>
-            </div>
+        <div className="flex items-center gap-3.5 pr-8">
+          <div className="size-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+            <Building2 className="size-5" />
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 text-xs font-bold"
-          >
-            ✕
-          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-white tracking-tight">
+                Aprovisionar Nueva Empresa (Tenant)
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-400 text-[10px] font-bold border border-amber-800/50">
+                Multi-Tenant
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Crea un espacio aislado con esquema fiscal, catálogo y usuario administrador
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* RUC Lookup Box */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-300">RUC de la Empresa (11 dígitos):</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                maxLength={11}
-                value={ruc}
-                onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
-                placeholder="Ej. 20608945123"
-                className="flex-1 px-3 py-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                onClick={handleLookupRuc}
-                disabled={isLookingUp || ruc.length !== 11}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Search className="size-3.5" />
-                {isLookingUp ? "Consultando..." : "SUNAT"}
-              </button>
-            </div>
-          </div>
-
-          {/* Names */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-400">Razón Social:</label>
-              <input
-                type="text"
-                value={razonSocial}
-                onChange={(e) => setRazonSocial(e.target.value)}
-                placeholder="Razón Social SUNAT"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-white"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-400">Nombre Comercial (Marca):</label>
-              <input
-                type="text"
-                value={nombreComercial}
-                onChange={(e) => setNombreComercial(e.target.value)}
-                placeholder="Ej. Supermercados Nova"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-white font-bold"
-              />
-            </div>
-          </div>
-
-          {/* Subscription Plan Selector */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-300">Plan de Suscripción SaaS:</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setPlan("starter")}
-                className={`p-3 rounded-2xl border text-left space-y-1 transition-all cursor-pointer ${
-                  plan === "starter"
-                    ? "border-slate-500 bg-slate-800/40 text-white"
-                    : "border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white"
-                }`}
-              >
-                <div className="text-[10px] font-bold uppercase">Starter</div>
-                <div className="text-sm font-black font-mono">$49/m</div>
-                <div className="text-[9px] text-slate-500">1 Tienda • 2 Cajas</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPlan("pro")}
-                className={`p-3 rounded-2xl border text-left space-y-1 transition-all cursor-pointer ${
-                  plan === "pro"
-                    ? "border-blue-500 bg-blue-950/40 text-blue-300 shadow-md shadow-blue-500/20"
-                    : "border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white"
-                }`}
-              >
-                <div className="text-[10px] font-bold uppercase text-blue-400">Pro (Recomendado)</div>
-                <div className="text-sm font-black font-mono text-blue-300">$149/m</div>
-                <div className="text-[9px] text-blue-400/80">3 Tiendas • 6 Cajas</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPlan("enterprise")}
-                className={`p-3 rounded-2xl border text-left space-y-1 transition-all cursor-pointer ${
-                  plan === "enterprise"
-                    ? "border-amber-500 bg-amber-950/40 text-amber-300 shadow-md shadow-amber-500/20"
-                    : "border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white"
-                }`}
-              >
-                <div className="text-[10px] font-bold uppercase text-amber-400">Enterprise</div>
-                <div className="text-sm font-black font-mono text-amber-300">$299/m</div>
-                <div className="text-[9px] text-amber-400/80">Ilimitado • GRE • API</div>
-              </button>
-            </div>
-          </div>
-
-          {/* Admin User Info */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2.5 text-xs">
-            <span className="font-bold text-slate-300">Usuario Administrador Inicial:</span>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-slate-400 block">Email de Acceso:</label>
-                <input
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="admin@empresa.pe"
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white"
-                />
+          {/* Section 1: RUC & Razón Social */}
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1.5">
+                RUC de la Empresa (SUNAT) *
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Hash className="size-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    maxLength={11}
+                    value={ruc}
+                    onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
+                    placeholder="20601234567"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    required
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLookupRuc}
+                  disabled={isLookingUp || ruc.length !== 11}
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Search className="size-3.5" />
+                  {isLookingUp ? "Consultando..." : "Consultar SUNAT"}
+                </button>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] text-slate-400 block">Nombre del Administrador:</label>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                  Nombre Comercial *
+                </label>
                 <input
                   type="text"
-                  value={adminNombre}
-                  onChange={(e) => setAdminNombre(e.target.value)}
-                  placeholder="Ej. Carlos Alarcón"
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white"
+                  value={nombreComercial}
+                  onChange={(e) => setNombreComercial(e.target.value)}
+                  placeholder="Ej: NovaMarket Surco"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                  Razón Social Fiscal
+                </label>
+                <input
+                  type="text"
+                  value={razonSocial}
+                  onChange={(e) => setRazonSocial(e.target.value)}
+                  placeholder="Ej: SUPERMERCADOS PERÚ S.A.C."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
               </div>
             </div>
           </div>
 
-          {/* Address */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-400">Dirección Sede Principal:</label>
-            <input
-              type="text"
-              value={direccionPrincipal}
-              onChange={(e) => setDireccionPrincipal(e.target.value)}
-              placeholder="Av. Javier Prado Este 4200, Lima"
-              className="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-white"
-            />
+          {/* Section 2: Plan SaaS */}
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+            <label className="block text-[11px] font-medium text-slate-300">
+              Plan SaaS de Suscripción
+            </label>
+            <div className="grid grid-cols-3 gap-2.5">
+              {[
+                { id: "starter", name: "Starter", price: "$49/mes", desc: "1 Tienda / 2 Cajas" },
+                { id: "pro", name: "Pro", price: "$149/mes", desc: "5 Tiendas / 10 Cajas" },
+                { id: "enterprise", name: "Enterprise", price: "$299/mes", desc: "Ilimitado + API" },
+              ].map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => setPlan(p.id as any)}
+                  className={`p-3 rounded-xl border text-center cursor-pointer transition-all ${
+                    plan === p.id
+                      ? "bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/10 ring-1 ring-amber-500/30"
+                      : "bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400"
+                  }`}
+                >
+                  <div className={`text-xs font-bold ${plan === p.id ? "text-amber-400" : "text-white"}`}>
+                    {p.name}
+                  </div>
+                  <div className="text-[11px] font-mono text-emerald-400 font-bold">{p.price}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">{p.desc}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between gap-3 pt-2">
+          {/* Section 3: Administrador Inicial */}
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                  Email Administrador *
+                </label>
+                <div className="relative">
+                  <Mail className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="email"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="gerencia@empresa.pe"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                  Nombre del Administrador
+                </label>
+                <div className="relative">
+                  <User className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={adminNombre}
+                    onChange={(e) => setAdminNombre(e.target.value)}
+                    placeholder="Ej: Roberto Ramos"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                Dirección Sede Principal
+              </label>
+              <div className="relative">
+                <MapPin className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  value={direccionPrincipal}
+                  onChange={(e) => setDireccionPrincipal(e.target.value)}
+                  placeholder="Av. Principal 123 - Lima"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs font-bold text-slate-300"
+              className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
             >
-              <CheckCircle2 className="size-4" />
-              {isSubmitting ? "Aprovisionando Tenant..." : "Aprovisionar y Crear Tenant"}
+              <CheckCircle2 className="size-3.5" />
+              {isSubmitting ? "Aprovisionando..." : "Aprovisionar Tenant"}
             </button>
           </div>
         </form>

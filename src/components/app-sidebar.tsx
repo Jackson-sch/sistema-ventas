@@ -49,7 +49,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       NovaMarket Core
                     </span>
                     <span className="text-[11px] text-amber-400 font-bold flex items-center gap-1 truncate">
-                      👑 Superadmin SaaS
+                      <Crown className="size-3 text-amber-400" /> Superadmin SaaS
                     </span>
                   </div>
                 </Link>
