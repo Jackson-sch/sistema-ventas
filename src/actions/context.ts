@@ -11,56 +11,46 @@ export interface DevContext {
   cajeroId: string;
 }
 
+let cachedContext: DevContext | null = null;
+let lastContextFetch = 0;
+const CONTEXT_TTL = 5 * 60 * 1000; // 5 minutos
+
 /**
- * Contexto de desarrollo: la app aún no tiene sesión autenticada
- * (login Supabase), así que las Server Actions resuelven el primer
- * tenant activo, su sucursal principal, la primera caja y un cajero
- * demo para poder persistir datos reales durante las pruebas.
+ * Contexto de desarrollo con caché en memoria (TTL 5 min)
+ * Evita 4 consultas secuenciales repetitivas en cada venta.
  */
 export async function getDevContext(): Promise<DevContext> {
-  const [tenant] = await db
-    .select({ id: schema.tenants.id })
-    .from(schema.tenants)
-    .where(eq(schema.tenants.estado, "activo"))
-    .limit(1);
-
-  if (!tenant) {
-    throw new Error("No hay un tenant activo en la base de datos. Ejecuta el seed primero.");
+  const now = Date.now();
+  if (cachedContext && now - lastContextFetch < CONTEXT_TTL) {
+    return cachedContext;
   }
 
-  const [sucursal] = await db
-    .select({ id: schema.sucursales.id })
-    .from(schema.sucursales)
-    .where(and(eq(schema.sucursales.tenantId, tenant.id), eq(schema.sucursales.estado, "activa")))
-    .orderBy(schema.sucursales.esPrincipal)
-    .limit(1);
+  const [tenantsRows, sucursalesRows, cajasRows, usuariosRows] = await Promise.all([
+    db.select({ id: schema.tenants.id }).from(schema.tenants).where(eq(schema.tenants.estado, "activo")).limit(1),
+    db.select({ id: schema.sucursales.id, tenantId: schema.sucursales.tenantId }).from(schema.sucursales).where(eq(schema.sucursales.estado, "activa")).limit(1),
+    db.select({ id: schema.cajas.id }).from(schema.cajas).limit(1),
+    db.select({ id: schema.usuarios.id }).from(schema.usuarios).limit(1),
+  ]);
 
-  if (!sucursal) {
-    throw new Error("El tenant no tiene sucursales activas.");
-  }
+  const tenant = tenantsRows[0];
+  if (!tenant) throw new Error("No hay un tenant activo en la base de datos.");
 
-  const [caja] = await db
-    .select({ id: schema.cajas.id })
-    .from(schema.cajas)
-    .where(eq(schema.cajas.sucursalId, sucursal.id))
-    .limit(1);
+  const sucursal = sucursalesRows[0];
+  if (!sucursal) throw new Error("El tenant no tiene sucursales activas.");
 
-  const [cajero] = await db
-    .select({ id: schema.usuarios.id })
-    .from(schema.usuarios)
-    .where(eq(schema.usuarios.tenantId, tenant.id))
-    .limit(1);
+  const caja = cajasRows[0];
+  const cajero = usuariosRows[0];
+  if (!cajero) throw new Error("No hay usuarios registrados para el tenant.");
 
-  if (!cajero) {
-    throw new Error("No hay usuarios registrados para el tenant.");
-  }
-
-  return {
+  cachedContext = {
     tenantId: tenant.id,
     sucursalId: sucursal.id,
     cajaId: caja?.id ?? "",
     cajeroId: cajero.id,
   };
+  lastContextFetch = now;
+
+  return cachedContext;
 }
 
 /**
@@ -90,13 +80,23 @@ export async function resolveSesionCaja(cajaId: string, sesionCajaId?: string) {
   return abierta ?? null;
 }
 
+const activeSessionsCache = new Map<string, { id: string; expires: number }>();
+
 /**
- * Busca una sesión abierta para la caja; si no existe, la crea con
- * monto de apertura 0. Devuelve la sesión resultante.
+ * Busca una sesión abierta para la caja con caché de 3 minutos; si no existe, la crea con
+ * monto de apertura 0. Devuelve la sesión resultante de forma instantánea.
  */
 export async function ensureSesionAbierta(cajaId: string, cajeroId: string): Promise<string> {
+  const cached = activeSessionsCache.get(cajaId);
+  if (cached && Date.now() < cached.expires) {
+    return cached.id;
+  }
+
   const existente = await resolveSesionCaja(cajaId);
-  if (existente) return existente.id;
+  if (existente) {
+    activeSessionsCache.set(cajaId, { id: existente.id, expires: Date.now() + 3 * 60 * 1000 });
+    return existente.id;
+  }
 
   const [nueva] = await db
     .insert(schema.sesionesCaja)
@@ -108,5 +108,6 @@ export async function ensureSesionAbierta(cajaId: string, cajeroId: string): Pro
     })
     .returning({ id: schema.sesionesCaja.id });
 
+  activeSessionsCache.set(cajaId, { id: nueva.id, expires: Date.now() + 3 * 60 * 1000 });
   return nueva.id;
 }

@@ -147,19 +147,63 @@ export async function completeSaleTransactionAction(
       try {
         const sesionCajaId = await ensureSesionAbierta(ctx.cajaId, ctx.cajeroId);
 
-        // Fetch valid product UUIDs from db for the items in cart
-        const dbProducts = await db
-          .select({ id: schema.productos.id, sku: schema.productos.sku })
-          .from(schema.productos)
-          .where(eq(schema.productos.tenantId, ctx.tenantId));
-
+        // Fetch only missing product UUIDs if any
+        const missingSkuItems = input.items.filter((i) => !i.id || i.id.length !== 36);
         const skuToIdMap = new Map<string, string>();
-        for (const p of dbProducts) {
-          skuToIdMap.set(p.sku.toLowerCase(), p.id);
+        if (missingSkuItems.length > 0) {
+          const skus = missingSkuItems.map((i) => i.sku);
+          const dbProducts = await db
+            .select({ id: schema.productos.id, sku: schema.productos.sku })
+            .from(schema.productos)
+            .where(sql`${schema.productos.sku} IN ${skus}`);
+          for (const p of dbProducts) {
+            skuToIdMap.set(p.sku.toLowerCase(), p.id);
+          }
         }
 
+        const detalleValues: any[] = [];
+        const kardexValues: any[] = [];
+        const stockUpdates: { prodId: string; cantidad: number }[] = [];
+
+        for (const item of input.items) {
+          const validProdId =
+            item.id && item.id.length === 36
+              ? item.id
+              : skuToIdMap.get(item.sku.toLowerCase());
+
+          if (validProdId) {
+            detalleValues.push({
+              ventaId,
+              productoId: validProdId,
+              cantidad: item.cantidad.toString(),
+              precioUnitario: item.precio.toString(),
+              descuento: "0.00",
+              subtotal: (item.precio * item.cantidad).toFixed(2),
+            });
+
+            kardexValues.push({
+              tenantId: ctx.tenantId,
+              sucursalId: ctx.sucursalId,
+              productoId: validProdId,
+              tipo: "salida" as const,
+              cantidad: item.cantidad.toString(),
+              motivo: `Venta POS ${serieNumero}`,
+              usuarioId: ctx.cajeroId,
+            });
+
+            stockUpdates.push({ prodId: validProdId, cantidad: item.cantidad });
+          }
+        }
+
+        const pagosValues = effectivePayments.map((p) => ({
+          ventaId,
+          medioPago: p.medioPago === "transferencia" ? "plin" : p.medioPago,
+          monto: p.monto.toFixed(2),
+          referencia: p.referencia || (p.medioPago !== "efectivo" ? `OP-${Date.now().toString().slice(-6)}` : null),
+        }));
+
         await db.transaction(async (tx) => {
-          // 1. Insert Venta con ID explícito
+          // 1. Insert Venta principal
           await tx.insert(schema.ventas).values({
             id: ventaId,
             tenantId: ctx.tenantId,
@@ -175,54 +219,37 @@ export async function completeSaleTransactionAction(
             estado: "completada",
           });
 
-          // 2. Insert Pagos (Multi-Payment support)
-          for (const p of effectivePayments) {
-            await tx.insert(schema.ventasPagos).values({
-              ventaId,
-              medioPago: p.medioPago === "transferencia" ? "plin" : p.medioPago,
-              monto: p.monto.toFixed(2),
-              referencia: p.referencia || (p.medioPago !== "efectivo" ? `OP-${Date.now().toString().slice(-6)}` : null),
-            });
+          // 2. Batch Insert Pagos
+          if (pagosValues.length > 0) {
+            await tx.insert(schema.ventasPagos).values(pagosValues);
           }
 
-          // 3. Insert Items & Deduct Stock & Kardex
-          for (const item of input.items) {
-            const validProdId =
-              item.id && item.id.length === 36
-                ? item.id
-                : skuToIdMap.get(item.sku.toLowerCase()) || dbProducts[0]?.id;
-
-            if (validProdId) {
-              await tx.insert(schema.ventasDetalle).values({
-                ventaId,
-                productoId: validProdId,
-                cantidad: item.cantidad.toString(),
-                precioUnitario: item.precio.toString(),
-                descuento: "0.00",
-                subtotal: (item.precio * item.cantidad).toFixed(2),
-              });
-
-              await tx
-                .update(schema.inventario)
-                .set({
-                  stockActual: sql`GREATEST(0, ${schema.inventario.stockActual} - ${item.cantidad})`,
-                  actualizadoEn: new Date(),
-                })
-                .where(eq(schema.inventario.productoId, validProdId));
-
-              await tx.insert(schema.movimientosInventario).values({
-                tenantId: ctx.tenantId,
-                sucursalId: ctx.sucursalId,
-                productoId: validProdId,
-                tipo: "salida",
-                cantidad: item.cantidad.toString(),
-                motivo: `Venta POS ${serieNumero}`,
-                usuarioId: ctx.cajeroId,
-              });
-            }
+          // 3. Batch Insert Detalle de Venta
+          if (detalleValues.length > 0) {
+            await tx.insert(schema.ventasDetalle).values(detalleValues);
           }
 
-          // 4. Insert Comprobante Electrónico
+          // 4. Batch Insert Kardex de Movimientos
+          if (kardexValues.length > 0) {
+            await tx.insert(schema.movimientosInventario).values(kardexValues);
+          }
+
+          // 5. Parallel Stock Decrement
+          if (stockUpdates.length > 0) {
+            await Promise.all(
+              stockUpdates.map((u) =>
+                tx
+                  .update(schema.inventario)
+                  .set({
+                    stockActual: sql`GREATEST(0, ${schema.inventario.stockActual} - ${u.cantidad})`,
+                    actualizadoEn: new Date(),
+                  })
+                  .where(eq(schema.inventario.productoId, u.prodId))
+              )
+            );
+          }
+
+          // 6. Insert Comprobante Electrónico
           await tx.insert(schema.comprobantes).values({
             ventaId,
             tipo: isFactura ? "factura" : "boleta",
@@ -234,7 +261,7 @@ export async function completeSaleTransactionAction(
             cdrUrl: `sunat/cdr/R-${serieNumero}.zip`,
           });
 
-          // 5. Puntos de fidelización
+          // 7. Puntos de fidelización (si aplica)
           if (input.clienteId && input.clienteId.length === 36 && puntosGanados > 0) {
             await tx
               .insert(schema.programaPuntos)
@@ -255,7 +282,7 @@ export async function completeSaleTransactionAction(
             });
           }
 
-          // 6. Auditoría inmutable
+          // 8. Auditoría inmutable
           await tx.insert(schema.auditoriaLog).values({
             tenantId: ctx.tenantId,
             usuarioId: ctx.cajeroId,
@@ -285,10 +312,6 @@ export async function completeSaleTransactionAction(
     try {
       revalidatePath("/pos");
       revalidatePath("/ventas");
-      revalidatePath("/inventario");
-      revalidatePath("/inventario/kardex");
-      revalidatePath("/clientes");
-      revalidatePath("/dashboard");
     } catch {
       // Ignorar si se ejecuta fuera de contexto HTTP Next.js
     }
