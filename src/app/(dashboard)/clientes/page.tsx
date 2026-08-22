@@ -397,6 +397,16 @@ export default function ClientesPage() {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         client={selectedClientHistory}
+        onPointsUpdated={(newPts) => {
+          if (selectedClientHistory) {
+            setClients((prev) =>
+              prev.map((c) =>
+                c.id === selectedClientHistory.id ? { ...c, puntos: newPts } : c
+              )
+            );
+            setSelectedClientHistory({ ...selectedClientHistory, puntos: newPts });
+          }
+        }}
       />
 
       {/* Secure Delete Confirmation Dialog */}

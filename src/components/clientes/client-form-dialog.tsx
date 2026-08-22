@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { lookupIdentityAction } from "@/actions/identity-lookup";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface ClientData {
   id: string;
@@ -163,15 +170,24 @@ export function ClientFormDialog({
               Tipo & Número de Documento *
             </label>
             <div className="flex gap-2">
-              <select
-                value={tipoDoc}
-                onChange={(e) => setTipoDoc(e.target.value as any)}
-                className="w-28 px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="DNI">DNI (8)</option>
-                <option value="RUC">RUC (11)</option>
-                <option value="CE">C.E.</option>
-              </select>
+              <div className="w-32">
+                <Select value={tipoDoc} onValueChange={(val: any) => setTipoDoc(val)}>
+                  <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950/80 border-slate-800 text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50">
+                    <SelectItem value="DNI" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      DNI (8 dígitos)
+                    </SelectItem>
+                    <SelectItem value="RUC" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      RUC (11 dígitos)
+                    </SelectItem>
+                    <SelectItem value="CE" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      Carnet Extr. (CE)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="relative flex-1">
                 <input
@@ -179,7 +195,7 @@ export function ClientFormDialog({
                   value={numDoc}
                   onChange={(e) => setNumDoc(e.target.value)}
                   placeholder={tipoDoc === "RUC" ? "20601234567" : "45892144"}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -188,7 +204,7 @@ export function ClientFormDialog({
                 type="button"
                 onClick={handleQueryDocument}
                 disabled={isSearchingApi}
-                className="px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all active:scale-95 shrink-0"
+                className="h-10 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all active:scale-95 shrink-0 cursor-pointer"
               >
                 {isSearchingApi ? (
                   <Sparkles className="size-3.5 animate-spin" />
@@ -273,15 +289,22 @@ export function ClientFormDialog({
               <label className="block text-[11px] font-semibold text-slate-400 mb-1">
                 Categoría de Cliente
               </label>
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
-              >
-                <option value="Estándar">Estándar</option>
-                <option value="VIP / Frecuente">VIP / Frecuente</option>
-                <option value="Mayorista">Mayorista</option>
-              </select>
+              <Select value={categoria} onValueChange={(val: any) => setCategoria(val)}>
+                <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950/80 border-slate-800 text-xs text-slate-200 focus:ring-1 focus:ring-blue-500 font-semibold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50">
+                  <SelectItem value="Estándar" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    Estándar
+                  </SelectItem>
+                  <SelectItem value="VIP / Frecuente" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300 font-bold text-amber-400">
+                    VIP / Frecuente
+                  </SelectItem>
+                  <SelectItem value="Mayorista" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300 font-bold text-blue-400">
+                    Mayorista
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

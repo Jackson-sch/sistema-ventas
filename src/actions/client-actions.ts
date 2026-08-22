@@ -1,8 +1,17 @@
 "use server";
 
 import { db } from "@/db";
-import { clientes, movimientosPuntos, programaPuntos, auditoriaLog } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import {
+  clientes,
+  movimientosPuntos,
+  programaPuntos,
+  auditoriaLog,
+  ventas,
+  comprobantes,
+  cajas,
+  ventasDetalle,
+} from "@/db/schema";
+import { eq, sql, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDevContext } from "./context";
 
@@ -189,5 +198,99 @@ export async function deleteClientAction(id: string, nombre: string) {
         error.message ||
         "Error al eliminar cliente. Verifica que no tenga ventas asociadas.",
     };
+  }
+}
+
+export interface ClientPurchaseRecord {
+  id: string;
+  comprobante: string;
+  tipoComprobante: string;
+  fecha: string;
+  hora: string;
+  caja: string;
+  total: number;
+  puntosGanados: number;
+  itemsCount: number;
+  estado: string;
+}
+
+export async function getClientPurchaseHistoryAction(
+  clientId: string
+): Promise<ClientPurchaseRecord[]> {
+  try {
+    if (!UUID_RE.test(clientId)) {
+      return [];
+    }
+
+    const ventasRows = await db
+      .select({
+        id: ventas.id,
+        total: ventas.total,
+        estado: ventas.estado,
+        creadoEn: ventas.creadoEn,
+        comprobanteTipo: comprobantes.tipo,
+        comprobanteSerie: comprobantes.serie,
+        comprobanteNumero: comprobantes.numero,
+        cajaNombre: cajas.nombre,
+      })
+      .from(ventas)
+      .leftJoin(comprobantes, eq(comprobantes.ventaId, ventas.id))
+      .leftJoin(cajas, eq(cajas.id, ventas.cajaId))
+      .where(eq(ventas.clienteId, clientId))
+      .orderBy(desc(ventas.creadoEn))
+      .limit(30);
+
+    if (!ventasRows || ventasRows.length === 0) {
+      return [];
+    }
+
+    // Get item counts for each sale
+    const ventaIds = ventasRows.map((v) => v.id);
+    const detalleRows = await db
+      .select({
+        ventaId: ventasDetalle.ventaId,
+        count: sql<number>`count(${ventasDetalle.id})`,
+      })
+      .from(ventasDetalle)
+      .where(sql`${ventasDetalle.ventaId} in ${ventaIds}`)
+      .groupBy(ventasDetalle.ventaId);
+
+    const countMap = new Map(detalleRows.map((d) => [d.ventaId, Number(d.count)]));
+
+    return ventasRows.map((v) => {
+      const fechaObj = new Date(v.creadoEn);
+      const fecha = fechaObj.toLocaleDateString("es-PE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      const hora = fechaObj.toLocaleTimeString("es-PE", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      const compStr = v.comprobanteSerie && v.comprobanteNumero
+        ? `${v.comprobanteSerie}-${v.comprobanteNumero}`
+        : `TKT-${v.id.substring(0, 8).toUpperCase()}`;
+
+      const totalNum = parseFloat(String(v.total)) || 0;
+      const puntosGanados = Math.floor(totalNum / 10);
+
+      return {
+        id: v.id,
+        comprobante: compStr,
+        tipoComprobante: v.comprobanteTipo || "Boleta",
+        fecha,
+        hora,
+        caja: v.cajaNombre || "Caja Principal",
+        total: totalNum,
+        puntosGanados,
+        itemsCount: countMap.get(v.id) || 1,
+        estado: v.estado,
+      };
+    });
+  } catch (error) {
+    console.error("Error in getClientPurchaseHistoryAction:", error);
+    return [];
   }
 }
