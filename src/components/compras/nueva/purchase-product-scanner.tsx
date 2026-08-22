@@ -115,7 +115,7 @@ export function PurchaseProductScanner({ onAddProduct }: PurchaseProductScannerP
   };
 
   return (
-    <div className="glass-panel p-4 rounded-3xl border border-slate-800 bg-slate-950/60 space-y-3">
+    <div className="glass-panel p-4 rounded-3xl border border-slate-800 bg-slate-950/60 space-y-3 relative z-30">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
           <Barcode className="size-3.5" /> Escáner de Productos & Búsqueda Rápida

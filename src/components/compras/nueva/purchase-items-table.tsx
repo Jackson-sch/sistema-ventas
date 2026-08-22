@@ -36,7 +36,7 @@ export function PurchaseItemsTable({
   const totalUnits = items.reduce((acc, i) => acc + (parseFloat(String(i.cantidad)) || 0), 0);
 
   return (
-    <div className="glass-panel rounded-3xl border border-slate-800 bg-slate-950/60 overflow-hidden flex flex-col">
+    <div className="glass-panel rounded-3xl border border-slate-800 bg-slate-950/60 overflow-hidden flex flex-col relative z-10">
       <div className="p-4 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
