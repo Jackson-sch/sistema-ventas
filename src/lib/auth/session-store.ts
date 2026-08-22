@@ -27,7 +27,11 @@ export function useUserSession() {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(SESSION_STORAGE_KEY) as UserRole;
       if (saved && ["cajero", "supervisor", "admin", "superadmin"].includes(saved)) {
-        setRole(isSuperadminPath ? "superadmin" : saved);
+        const effectiveRole = isSuperadminPath ? "superadmin" : saved;
+        setRole(effectiveRole);
+        document.cookie = `novamarket_active_role=${effectiveRole}; path=/; max-age=2592000; SameSite=Lax`;
+      } else {
+        document.cookie = `novamarket_active_role=${isSuperadminPath ? "superadmin" : "admin"}; path=/; max-age=2592000; SameSite=Lax`;
       }
     }
   }, [isSuperadminPath]);
@@ -36,6 +40,7 @@ export function useUserSession() {
     setRole(newRole);
     if (typeof window !== "undefined") {
       localStorage.setItem(SESSION_STORAGE_KEY, newRole);
+      document.cookie = `novamarket_active_role=${newRole}; path=/; max-age=2592000; SameSite=Lax`;
     }
     if (newRole === "superadmin") {
       router.push("/superadmin");
