@@ -30,6 +30,7 @@ import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { QuotationSheetDialog } from "@/components/ventas/quotation-sheet-dialog";
+import { QuotationFormDialog } from "@/components/ventas/quotation-form-dialog";
 import {
   getQuotationsAction,
   createQuotationAction,
@@ -39,13 +40,6 @@ import {
   QuotationItem,
 } from "@/actions/quotation-actions";
 import { getProductsData, getClientsData } from "@/actions/data-fetchers";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export default function CotizacionesPage() {
   const router = useRouter();
@@ -71,30 +65,16 @@ export default function CotizacionesPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [quotationToDelete, setQuotationToDelete] = useState<QuotationRecord | null>(null);
 
-  // Form State
-  const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
   const [availableClients, setAvailableClients] = useState<any[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [clientDoc, setClientDoc] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [clientTypeDoc, setClientTypeDoc] = useState<"DNI" | "RUC">("DNI");
-  const [clientPhone, setClientPhone] = useState("");
-  const [validityDays, setValidityDays] = useState(7);
-  const [formItems, setFormItems] = useState<QuotationItem[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [selectedProductQty, setSelectedProductQty] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [quotes, prods, clis] = await Promise.all([
+      const [quotes, clis] = await Promise.all([
         getQuotationsAction(),
-        getProductsData(),
         getClientsData(),
       ]);
       setQuotations(quotes);
-      setCatalogProducts(prods || []);
       setAvailableClients(clis || []);
     } catch {
       toast.error("Error al cargar cotizaciones.");
@@ -109,124 +89,60 @@ export default function CotizacionesPage() {
 
   const handleOpenNewModal = () => {
     setEditingQuotation(null);
-    setSelectedClientId("");
-    setClientDoc("");
-    setClientName("");
-    setClientTypeDoc("DNI");
-    setClientPhone("");
-    setValidityDays(7);
-    setFormItems([]);
-    setSelectedProductId("");
-    setSelectedProductQty(1);
     setIsFormModalOpen(true);
   };
 
   const handleOpenEditModal = (q: QuotationRecord) => {
     setEditingQuotation(q);
-    setSelectedClientId("");
-    setClientDoc(q.clienteDoc);
-    setClientName(q.clienteNombre);
-    setClientTypeDoc(q.clienteTipoDoc);
-    setClientPhone(q.clienteTelefono || "");
-    setValidityDays(7);
-    setFormItems([...q.items]);
-    setSelectedProductId("");
-    setSelectedProductQty(1);
     setIsFormModalOpen(true);
   };
 
-  const handleAddItemToForm = () => {
-    if (!selectedProductId) return;
-    const prod = catalogProducts.find((p) => p.id === selectedProductId);
-    if (!prod) return;
+  const handleSaveQuotation = async (formData: {
+    clienteDoc: string;
+    clienteNombre: string;
+    clienteTipoDoc: "DNI" | "RUC";
+    clienteTelefono?: string;
+    clienteEmail?: string;
+    moneda: "PEN" | "USD";
+    diasValidez: number;
+    items: QuotationItem[];
+    observaciones?: string;
+  }) => {
+    if (editingQuotation) {
+      const res = await updateQuotationAction({
+        id: editingQuotation.id,
+        clienteDoc: formData.clienteDoc,
+        clienteNombre: formData.clienteNombre,
+        clienteTipoDoc: formData.clienteTipoDoc,
+        clienteTelefono: formData.clienteTelefono,
+        diasValidez: formData.diasValidez,
+        items: formData.items,
+      });
 
-    const existing = formItems.find((i) => i.productoId === prod.id);
-    if (existing) {
-      existing.cantidad += selectedProductQty;
-      existing.total = +(existing.cantidad * existing.precioUnit).toFixed(2);
-      setFormItems([...formItems]);
-    } else {
-      const newItem: QuotationItem = {
-        productoId: prod.id,
-        sku: prod.sku,
-        nombre: prod.nombre,
-        cantidad: selectedProductQty,
-        precioUnit: prod.precioVenta,
-        total: +(selectedProductQty * prod.precioVenta).toFixed(2),
-        tipo: prod.tipoVenta || "unidad",
-      };
-      setFormItems([newItem, ...formItems]);
-    }
-    setSelectedProductId("");
-    setSelectedProductQty(1);
-  };
-
-  const handleRemoveItemFromForm = (idx: number) => {
-    setFormItems(formItems.filter((_, i) => i !== idx));
-  };
-
-  const handleClientSelect = (clientId: string) => {
-    setSelectedClientId(clientId);
-    const cli = availableClients.find((c) => c.id === clientId);
-    if (cli) {
-      setClientDoc(cli.numDoc);
-      setClientName(cli.nombre);
-      setClientTypeDoc(cli.tipoDoc === "RUC" ? "RUC" : "DNI");
-      setClientPhone(cli.telefono || "");
-    }
-  };
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientName || !clientDoc) {
-      toast.error("Ingrese el nombre y documento del cliente.");
-      return;
-    }
-    if (formItems.length === 0) {
-      toast.error("Agregue al menos un producto a la cotización.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      if (editingQuotation) {
-        const res = await updateQuotationAction({
-          id: editingQuotation.id,
-          clienteDoc: clientDoc,
-          clienteNombre: clientName,
-          clienteTipoDoc: clientTypeDoc,
-          clienteTelefono: clientPhone,
-          diasValidez: validityDays,
-          items: formItems,
-        });
-
-        if (res.success && res.quotation) {
-          toast.success(`Cotización ${res.quotation.codigo} actualizada con éxito.`);
-          setIsFormModalOpen(false);
-          loadData();
-        } else {
-          toast.error(res.error || "Error al actualizar cotización.");
-        }
+      if (res.success && res.quotation) {
+        toast.success(`Cotización ${res.quotation.codigo} actualizada con éxito.`);
+        loadData();
       } else {
-        const res = await createQuotationAction({
-          clienteDoc: clientDoc,
-          clienteNombre: clientName,
-          clienteTipoDoc: clientTypeDoc,
-          clienteTelefono: clientPhone,
-          diasValidez: validityDays,
-          items: formItems,
-        });
-
-        if (res.success) {
-          toast.success(`Cotización ${res.quotation.codigo} generada exitosamente.`);
-          setIsFormModalOpen(false);
-          loadData();
-        }
+        toast.error(res.error || "Error al actualizar cotización.");
+        throw new Error(res.error);
       }
-    } catch {
-      toast.error("Error al procesar la cotización.");
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      const res = await createQuotationAction({
+        clienteDoc: formData.clienteDoc,
+        clienteNombre: formData.clienteNombre,
+        clienteTipoDoc: formData.clienteTipoDoc,
+        clienteTelefono: formData.clienteTelefono,
+        diasValidez: formData.diasValidez,
+        items: formData.items,
+      });
+
+      if (res.success && res.quotation) {
+        toast.success(`Cotización ${res.quotation.codigo} generada exitosamente.`);
+        loadData();
+      } else {
+        toast.error(res.error || "Error al generar cotización.");
+        throw new Error(res.error);
+      }
     }
   };
 
@@ -567,209 +483,13 @@ export default function CotizacionesPage() {
       />
 
       {/* Create / Edit Quotation Modal */}
-      {isFormModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl bg-[hsl(224,71%,4%)] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <FileText className="size-5 text-blue-400" />
-                {editingQuotation ? `Editar Proforma ${editingQuotation.codigo}` : "Crear Nueva Cotización / Proforma"}
-              </h3>
-              <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-
-            <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
-              {/* Client Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-slate-400 font-bold">Cliente Frecuente (Opcional):</label>
-                  <Select value={selectedClientId} onValueChange={handleClientSelect}>
-                    <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950 border-slate-800 text-xs text-white focus:ring-1 focus:ring-blue-500">
-                      <SelectValue placeholder="-- Seleccionar o escribir manual --" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-[10000] max-h-60">
-                      {availableClients.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                          <div className="flex items-center justify-between gap-2 w-full">
-                            <span className="font-bold">{c.nombre}</span>
-                            <span className="text-slate-400 font-mono text-[10px]">({c.numDoc})</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-400 font-bold">Días de Validez / Vigencia:</label>
-                  <Select value={String(validityDays)} onValueChange={(v) => setValidityDays(Number(v))}>
-                    <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950 border-slate-800 text-xs text-white focus:ring-1 focus:ring-blue-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-[10000]">
-                      <SelectItem value="3" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                        3 días calendario
-                      </SelectItem>
-                      <SelectItem value="7" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                        7 días calendario (Recomendado)
-                      </SelectItem>
-                      <SelectItem value="15" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                        15 días calendario
-                      </SelectItem>
-                      <SelectItem value="30" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                        30 días calendario
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Manual Client Data */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-slate-400 font-bold">Tipo Doc:</label>
-                  <Select value={clientTypeDoc} onValueChange={(v: any) => setClientTypeDoc(v)}>
-                    <SelectTrigger className="w-full h-10 rounded-xl bg-slate-950 border-slate-800 text-xs text-white focus:ring-1 focus:ring-blue-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-[10000]">
-                      <SelectItem value="DNI" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                        DNI (Persona)
-                      </SelectItem>
-                      <SelectItem value="RUC" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                        RUC (Empresa)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-slate-400 font-bold">Número de Doc:</label>
-                  <input
-                    type="text"
-                    value={clientDoc}
-                    onChange={(e) => setClientDoc(e.target.value)}
-                    placeholder="Ej: 20601234567"
-                    className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-slate-400 font-bold">Razón Social / Nombre:</label>
-                  <input
-                    type="text"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Ej: Inversiones Retail SAC"
-                    className="w-full h-10 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Add Product Box */}
-              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
-                <span className="text-[11px] font-bold text-white block uppercase tracking-wider">
-                  Agregar Ítems a la Proforma:
-                </span>
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <div className="flex-1 w-full">
-                    <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                      <SelectTrigger className="w-full h-10 rounded-xl bg-slate-900 border-slate-700 text-xs text-white focus:ring-1 focus:ring-blue-500">
-                        <SelectValue placeholder="-- Seleccionar Producto del Catálogo --" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-[10000] max-h-60">
-                        {catalogProducts.map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
-                            <div className="flex items-center justify-between gap-3 w-full">
-                              <span className="font-bold">{p.nombre}</span>
-                              <span className="text-emerald-400 font-mono text-[11px] font-bold">
-                                {formatCurrency(p.precioVenta)}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={selectedProductQty}
-                    onChange={(e) => setSelectedProductQty(Number(e.target.value))}
-                    className="w-20 h-10 px-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-center font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddItemToForm}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="size-3.5" /> Agregar
-                  </button>
-                </div>
-
-                {/* Form Items List */}
-                {formItems.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-slate-800">
-                    {formItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80"
-                      >
-                        <div className="space-y-0.5">
-                          <div className="text-white font-bold">{item.nombre}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {item.cantidad} {item.tipo === "peso" ? "kg" : "und"} × S/ {item.precioUnit.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-emerald-400">
-                            {formatCurrency(item.total)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItemFromForm(idx)}
-                            className="text-slate-500 hover:text-rose-400"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Total & Submit */}
-              <div className="flex items-center justify-between pt-2">
-                <div className="text-sm">
-                  <span className="text-slate-400 block text-xs">Total Estimado:</span>
-                  <strong className="text-emerald-400 font-mono text-base">
-                    {formatCurrency(formItems.reduce((acc, i) => acc + i.total, 0))}
-                  </strong>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsFormModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-300"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/30 flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 className="size-4" />
-                    {isSubmitting ? "Guardando..." : editingQuotation ? "Guardar Cambios" : "Emitir Proforma"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <QuotationFormDialog
+        isOpen={isFormModalOpen}
+        onClose={() => setIsFormModalOpen(false)}
+        quotationToEdit={editingQuotation}
+        availableClients={availableClients}
+        onSave={handleSaveQuotation}
+      />
     </div>
   );
 }

@@ -121,7 +121,7 @@ export async function createQuotationAction(input: {
   diasValidez: number;
   items: QuotationItem[];
   observaciones?: string;
-}): Promise<{ success: boolean; quotation: QuotationRecord }> {
+}): Promise<{ success: boolean; quotation?: QuotationRecord; error?: string }> {
   const nextNum = inMemoryQuotations.length + 42;
   const codigo = `COT-2026-${String(nextNum).padStart(5, "0")}`;
 
