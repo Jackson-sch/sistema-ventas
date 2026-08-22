@@ -7,7 +7,9 @@ import {
   getPurchaseOrdersAction,
   receivePurchaseOrderAction,
   deletePurchaseOrderAction,
+  updatePurchaseOrderStatusAction,
   PurchaseOrderRecord,
+  PurchaseOrderStatus,
 } from "@/actions/purchase-order-actions";
 import { getSuppliersData } from "@/actions/data-fetchers";
 import { OrdenesKpis } from "@/components/compras/ordenes/ordenes-kpis";
@@ -74,6 +76,23 @@ export default function PurchaseOrdersPage() {
     setOrderToDelete(order);
     setIsDeleteOpen(true);
   }, []);
+
+  const handleStatusChange = useCallback(
+    async (order: PurchaseOrderRecord, newStatus: PurchaseOrderStatus) => {
+      try {
+        const res = await updatePurchaseOrderStatusAction(order.id, newStatus);
+        if (res.success) {
+          toast.success(`Estado de orden ${order.codigoOC} actualizado con éxito.`);
+          loadData(false);
+        } else {
+          toast.error(res.error || "Error al actualizar estado.");
+        }
+      } catch {
+        toast.error("Error al actualizar estado de la orden.");
+      }
+    },
+    []
+  );
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
@@ -179,6 +198,7 @@ export default function PurchaseOrdersPage() {
           onViewSheet={handleViewSheet}
           onReceive={handleReceive}
           onDelete={handleDeleteRequest}
+          onStatusChange={handleStatusChange}
         />
       </div>
 

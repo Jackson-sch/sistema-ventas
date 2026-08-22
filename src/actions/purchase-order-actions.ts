@@ -441,11 +441,38 @@ export async function receivePurchaseOrderAction(input: {
   }
 }
 
+export async function updatePurchaseOrderStatusAction(
+  orderId: string,
+  nuevoEstado: PurchaseOrderStatus
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    let dbStatus: "pendiente" | "aprobada" | "recibida_parcial" | "recibida_completa" | "cancelada" = "pendiente";
+    if (nuevoEstado === "ENVIADA_PROVEEDOR") dbStatus = "aprobada";
+    else if (nuevoEstado === "RECEPCION_PARCIAL") dbStatus = "recibida_parcial";
+    else if (nuevoEstado === "RECEPCIONADA_TOTAL") dbStatus = "recibida_completa";
+    else if (nuevoEstado === "ANULADA") dbStatus = "cancelada";
+    else dbStatus = "pendiente";
+
+    await db
+      .update(schema.ordenesCompra)
+      .set({ estado: dbStatus })
+      .where(eq(schema.ordenesCompra.id, orderId));
+
+    revalidatePath("/compras");
+    revalidatePath("/compras/ordenes");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating order status:", error);
+    return { success: false, error: error.message || "Error al actualizar estado de la orden." };
+  }
+}
+
 export async function deletePurchaseOrderAction(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await db.delete(schema.ordenesCompra).where(eq(schema.ordenesCompra.id, id));
+    revalidatePath("/compras");
     revalidatePath("/compras/ordenes");
     return { success: true };
   } catch (error: any) {

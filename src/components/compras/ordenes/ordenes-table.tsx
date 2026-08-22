@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-table";
 import { ShoppingCart } from "lucide-react";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { PurchaseOrderRecord } from "@/actions/purchase-order-actions";
+import { PurchaseOrderRecord, PurchaseOrderStatus } from "@/actions/purchase-order-actions";
 import { getOrdenesColumns } from "./ordenes-columns";
 
 interface OrdenesTableProps {
@@ -21,6 +21,7 @@ interface OrdenesTableProps {
   onViewSheet: (order: PurchaseOrderRecord) => void;
   onReceive: (order: PurchaseOrderRecord) => void;
   onDelete: (order: PurchaseOrderRecord) => void;
+  onStatusChange: (order: PurchaseOrderRecord, newStatus: PurchaseOrderStatus) => void;
 }
 
 export function OrdenesTable({
@@ -30,6 +31,7 @@ export function OrdenesTable({
   onViewSheet,
   onReceive,
   onDelete,
+  onStatusChange,
 }: OrdenesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "codigoOC", desc: true },
@@ -38,8 +40,8 @@ export function OrdenesTable({
   const [pageIndex, setPageIndex] = useState(0);
 
   const columns = useMemo(
-    () => getOrdenesColumns({ onViewSheet, onReceive, onDelete }),
-    [onViewSheet, onReceive, onDelete]
+    () => getOrdenesColumns({ onViewSheet, onReceive, onDelete, onStatusChange }),
+    [onViewSheet, onReceive, onDelete, onStatusChange]
   );
 
   const filteredData = useMemo(() => {
