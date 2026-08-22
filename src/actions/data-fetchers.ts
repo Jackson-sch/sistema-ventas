@@ -324,8 +324,30 @@ export async function getBranchesAndRegistersData() {
         }
         const totalHoyPorCaja = new Map(ventasHoyRows.map((v) => [v.cajaId, parseFloat(String(v.total))]));
 
-        return sucursalesRows.map((s, bIdx) => {
-          const matchedCajas = cajasRows.filter((c) => c.sucursalId === s.id);
+        // Deduplicate sucursales by unique ID and name
+        const seenBranchNames = new Set<string>();
+        const uniqueBranches = sucursalesRows.filter((s) => {
+          if (seenBranchNames.has(s.nombre)) return false;
+          seenBranchNames.add(s.nombre);
+          return true;
+        });
+
+        // Principal first, then alphabetical
+        uniqueBranches.sort((a, b) => {
+          if (a.esPrincipal && !b.esPrincipal) return -1;
+          if (!a.esPrincipal && b.esPrincipal) return 1;
+          return a.nombre.localeCompare(b.nombre);
+        });
+
+        return uniqueBranches.map((s, bIdx) => {
+          const rawCajas = cajasRows.filter((c) => c.sucursalId === s.id);
+          const seenCajaNames = new Set<string>();
+          const matchedCajas = rawCajas.filter((c) => {
+            if (seenCajaNames.has(c.nombre)) return false;
+            seenCajaNames.add(c.nombre);
+            return true;
+          });
+
           return {
             id: s.id,
             nombre: s.nombre,
