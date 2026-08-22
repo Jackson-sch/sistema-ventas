@@ -8,7 +8,9 @@ export interface DevContext {
   tenantId: string;
   sucursalId: string;
   cajaId: string;
+  cajaNombre?: string;
   cajeroId: string;
+  cajeroNombre?: string;
 }
 
 let cachedContext: DevContext | null = null;
@@ -28,8 +30,8 @@ export async function getDevContext(): Promise<DevContext> {
   const [tenantsRows, sucursalesRows, cajasRows, usuariosRows] = await Promise.all([
     db.select({ id: schema.tenants.id }).from(schema.tenants).where(eq(schema.tenants.estado, "activo")).limit(1),
     db.select({ id: schema.sucursales.id, tenantId: schema.sucursales.tenantId }).from(schema.sucursales).where(eq(schema.sucursales.estado, "activa")).limit(1),
-    db.select({ id: schema.cajas.id }).from(schema.cajas).limit(1),
-    db.select({ id: schema.usuarios.id }).from(schema.usuarios).limit(1),
+    db.select({ id: schema.cajas.id, nombre: schema.cajas.nombre }).from(schema.cajas).limit(1),
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre }).from(schema.usuarios).limit(1),
   ]);
 
   const tenant = tenantsRows[0];
@@ -46,7 +48,9 @@ export async function getDevContext(): Promise<DevContext> {
     tenantId: tenant.id,
     sucursalId: sucursal.id,
     cajaId: caja?.id ?? "",
+    cajaNombre: caja?.nombre ?? "Caja 01 - Principal",
     cajeroId: cajero.id,
+    cajeroNombre: cajero.nombre ?? "Admin General",
   };
   lastContextFetch = now;
 

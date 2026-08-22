@@ -331,11 +331,11 @@ export async function completeSaleTransactionAction(
       tipo: isFactura ? "Factura" : "Boleta",
       fecha: fechaActual.toLocaleDateString("es-PE"),
       hora: fechaActual.toLocaleTimeString("es-PE"),
-      caja: "Caja 01 - Principal",
-      cajero: "Carlos Alarcón",
+      caja: ctx.cajaNombre || "Caja 01 - Principal",
+      cajero: ctx.cajeroNombre || "Admin General",
       cliente: {
         nombre: input.clienteNombre || "CLIENTES VARIOS",
-        documentoTipo: isFactura ? "RUC" : "DNI",
+        documentoTipo: isFactura ? "RUC" : (input.clienteDoc && input.clienteDoc.length === 11 ? "RUC" : "DNI"),
         documentoNumero: input.clienteDoc || "00000000",
       },
       items: input.items.map((item) => ({

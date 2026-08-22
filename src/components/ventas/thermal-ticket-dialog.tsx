@@ -133,7 +133,7 @@ export function ThermalTicketDialog({
             {/* Store Fiscal Header */}
             <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-400">
               <div className="text-base font-black tracking-wider uppercase">NOVAMARKET SUPERMERCADOS</div>
-              <div className="text-[11px] font-bold text-slate-700">R.U.C. 20608912345</div>
+              <div className="text-[11px] font-bold text-slate-700">R.U.C. 20608945123</div>
               <div className="text-[10px] text-slate-600 leading-tight">
                 AV. JAVIER PRADO ESTE 4200 - SURCO - LIMA
               </div>
@@ -158,12 +158,16 @@ export function ThermalTicketDialog({
                 <span>HORA: {ticket.hora}</span>
               </div>
               <div className="flex justify-between">
-                <span>CAJA: {ticket.caja}</span>
-                <span>CAJERO: {ticket.cajero}</span>
+                <span>CAJA: {ticket.caja || "Caja 01 - Principal"}</span>
+                <span>CAJERO: {ticket.cajero || "Admin General"}</span>
               </div>
               <div className="pt-1">
-                <div>CLIENTE: <strong className="uppercase">{ticket.cliente?.nombre || "Clientes Varios"}</strong></div>
-                <div>{ticket.cliente?.documentoTipo || "DNI"}: {ticket.cliente?.documentoNumero || "00000000"}</div>
+                <div>CLIENTE: <strong className="uppercase">{ticket.cliente?.nombre || "CLIENTES VARIOS"}</strong></div>
+                <div>
+                  {(ticket.cliente?.documentoTipo === "VARIOS" || !ticket.cliente?.documentoTipo
+                    ? (ticket.cliente?.documentoNumero?.length === 11 ? "RUC" : "DNI")
+                    : ticket.cliente.documentoTipo)}: {ticket.cliente?.documentoNumero || "00000000"}
+                </div>
                 {ticket.cliente?.direccion && <div>DIR: {ticket.cliente.direccion}</div>}
               </div>
             </div>
