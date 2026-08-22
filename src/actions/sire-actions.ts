@@ -99,7 +99,7 @@ export async function getSireOverviewDataAction(
   año: string = "2026",
   mes: string = "08"
 ): Promise<SireOverviewData> {
-  const ruc = "20608912345";
+  const ruc = "20608945123";
   const razonSocial = "NOVAMARKET SUPERMERCADOS S.A.C.";
   const periodo = `${año}-${mes.padStart(2, "0")}`;
 
@@ -108,11 +108,12 @@ export async function getSireOverviewDataAction(
 
   try {
     if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
-      const [ventasRows, comprobantesRows, clientesRows, ordenesRows, proveedoresRows] = await Promise.all([
+      const [ventasRows, comprobantesRows, clientesRows, ordenesRows, ordenesDetalleRows, proveedoresRows] = await Promise.all([
         db.select().from(schema.ventas).orderBy(desc(schema.ventas.creadoEn)),
         db.select().from(schema.comprobantes),
         db.select().from(schema.clientes),
-        db.select().from(schema.ordenesCompra),
+        db.select().from(schema.ordenesCompra).orderBy(desc(schema.ordenesCompra.creadoEn)),
+        db.select().from(schema.ordenesCompraDetalle),
         db.select().from(schema.proveedores),
       ]);
 
@@ -125,8 +126,8 @@ export async function getSireOverviewDataAction(
           const client = v.clienteId ? clientMap.get(v.clienteId) : null;
           const fechaD = new Date(v.creadoEn);
           const totalVal = parseFloat(v.total);
-          const igvVal = parseFloat(v.igv || "0");
-          const subtotalVal = parseFloat(v.subtotal || "0");
+          const igvVal = parseFloat(v.igv || "0") || +(totalVal - totalVal / 1.18).toFixed(2);
+          const subtotalVal = parseFloat(v.subtotal || "0") || +(totalVal / 1.18).toFixed(2);
 
           return {
             periodo: `${año}${mes.padStart(2, "0")}00`,
@@ -134,7 +135,7 @@ export async function getSireOverviewDataAction(
             correlativoAsiento: `M${String(idx + 1).padStart(5, "0")}`,
             fechaEmision: fechaD.toLocaleDateString("es-PE"),
             tipoComprobante: (comp?.tipo === "factura" ? "01" : "03") as "01" | "03",
-            serie: comp?.serie || "B001",
+            serie: comp?.serie || (client?.tipoDocumento === "ruc" ? "F001" : "B001"),
             numero: comp?.numero || String(42900 + idx).padStart(8, "0"),
             tipoDocIdentidad: (client?.tipoDocumento === "ruc" ? "6" : "1") as "1" | "6",
             numDocIdentidad: client?.numeroDocumento || "00000000",
@@ -150,9 +151,18 @@ export async function getSireOverviewDataAction(
 
       if (ordenesRows && ordenesRows.length > 0) {
         const provMap = new Map(proveedoresRows.map((p) => [p.id, p]));
+        const subtotalPorOrden = new Map<string, number>();
+        for (const d of ordenesDetalleRows) {
+          const lineTotal = parseFloat(d.cantidadPedida) * parseFloat(d.precioUnitarioCosto);
+          subtotalPorOrden.set(d.ordenCompraId, (subtotalPorOrden.get(d.ordenCompraId) ?? 0) + lineTotal);
+        }
+
         comprasRecords = ordenesRows.map((o, idx) => {
           const prov = provMap.get(o.proveedorId);
           const fechaD = o.fechaEmision ? new Date(`${o.fechaEmision}T00:00:00`) : new Date();
+          const subtotalVal = +(subtotalPorOrden.get(o.id) ?? 1500.0).toFixed(2);
+          const igvVal = +(subtotalVal * 0.18).toFixed(2);
+          const totalVal = +(subtotalVal + igvVal).toFixed(2);
 
           return {
             periodo: `${año}${mes.padStart(2, "0")}00`,
@@ -161,13 +171,13 @@ export async function getSireOverviewDataAction(
             fechaEmision: fechaD.toLocaleDateString("es-PE"),
             tipoComprobante: "01" as const,
             serie: "F001",
-            numero: String(8000 + idx).padStart(8, "0"),
+            numero: o.numero ? o.numero.replace(/\D/g, "").padStart(8, "0") : String(8000 + idx).padStart(8, "0"),
             tipoDocProveedor: "6" as const,
             numDocProveedor: prov?.ruc || "20100190797",
             razonSocialProveedor: prov?.razonSocial || "Proveedor",
-            baseImponibleGravada: 3000.0,
-            igv: 540.0,
-            totalComprobante: 3540.0,
+            baseImponibleGravada: subtotalVal,
+            igv: igvVal,
+            totalComprobante: totalVal,
             moneda: "PEN" as const,
             estadoOperacion: "1" as const,
           };
