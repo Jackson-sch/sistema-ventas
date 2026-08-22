@@ -56,7 +56,14 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
           {/* Role specific return CTA */}
           <div className="pt-2 space-y-2.5">
-            {role === "cajero" ? (
+            {role === "superadmin" ? (
+              <Link
+                href="/superadmin"
+                className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
+              >
+                <Crown className="size-4" /> Volver a Consola Superadmin
+              </Link>
+            ) : role === "cajero" ? (
               <Link
                 href="/pos"
                 className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all"

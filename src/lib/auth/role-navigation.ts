@@ -492,14 +492,30 @@ const ALLOWED_ROUTES_BY_ROLE: Record<UserRole, string[]> = {
     "/consultas",
     "/login",
   ],
-  superadmin: ["*"],
+  superadmin: [
+    "/superadmin",
+    "/auditoria",
+    "/dev/venta-test",
+    "/login",
+  ],
 };
 
 export function canRoleAccessRoute(role: UserRole, pathname: string): boolean {
-  if (role === "superadmin") return true;
   if (!pathname || pathname === "/") return true;
 
   const cleanPath = pathname.split("?")[0].replace(/\/$/, "") || "/";
+
+  // Superadmin is strictly restricted to global platform, audit and dev routes
+  if (role === "superadmin") {
+    return (
+      cleanPath === "/superadmin" ||
+      cleanPath.startsWith("/superadmin/") ||
+      cleanPath === "/auditoria" ||
+      cleanPath.startsWith("/auditoria/") ||
+      cleanPath.startsWith("/dev/") ||
+      cleanPath === "/login"
+    );
+  }
 
   // For cashier, strictly forbid admin/supervisor sub-routes
   if (role === "cajero") {
