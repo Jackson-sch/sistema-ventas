@@ -24,7 +24,13 @@ import {
   getSireOverviewDataAction,
   SireOverviewData,
 } from "@/actions/sire-actions";
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useQueryState, parseAsString } from "nuqs";
 
 export default function SireSunatPage() {
@@ -99,35 +105,44 @@ export default function SireSunatPage() {
 
         {/* Period Selector & Download Actions */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-            <Calendar className="size-3.5 text-blue-400" />
-            <select
-              value={año}
-              onChange={(e) => setAño(e.target.value)}
-              className="bg-transparent text-white font-mono font-bold focus:outline-none cursor-pointer"
-            >
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-            </select>
-            <span className="text-slate-600">/</span>
-            <select
-              value={mes}
-              onChange={(e) => setMes(e.target.value)}
-              className="bg-transparent text-white font-mono font-bold focus:outline-none cursor-pointer"
-            >
-              <option value="01">Enero (01)</option>
-              <option value="02">Febrero (02)</option>
-              <option value="03">Marzo (03)</option>
-              <option value="04">Abril (04)</option>
-              <option value="05">Mayo (05)</option>
-              <option value="06">Junio (06)</option>
-              <option value="07">Julio (07)</option>
-              <option value="08">Agosto (08)</option>
-              <option value="09">Setiembre (09)</option>
-              <option value="10">Octubre (10)</option>
-              <option value="11">Noviembre (11)</option>
-              <option value="12">Diciembre (12)</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <div className="w-28">
+              <Select value={año} onValueChange={(val) => setAño(val)}>
+                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-900 border-slate-800 text-xs text-white font-mono font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50 font-mono">
+                  <SelectItem value="2026" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    2026
+                  </SelectItem>
+                  <SelectItem value="2025" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                    2025
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-40">
+              <Select value={mes} onValueChange={(val) => setMes(val)}>
+                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-900 border-slate-800 text-xs text-white font-mono font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50 font-mono">
+                  <SelectItem value="01" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Enero (01)</SelectItem>
+                  <SelectItem value="02" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Febrero (02)</SelectItem>
+                  <SelectItem value="03" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Marzo (03)</SelectItem>
+                  <SelectItem value="04" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Abril (04)</SelectItem>
+                  <SelectItem value="05" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Mayo (05)</SelectItem>
+                  <SelectItem value="06" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Junio (06)</SelectItem>
+                  <SelectItem value="07" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Julio (07)</SelectItem>
+                  <SelectItem value="08" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Agosto (08)</SelectItem>
+                  <SelectItem value="09" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Setiembre (09)</SelectItem>
+                  <SelectItem value="10" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Octubre (10)</SelectItem>
+                  <SelectItem value="11" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Noviembre (11)</SelectItem>
+                  <SelectItem value="12" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">Diciembre (12)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <button

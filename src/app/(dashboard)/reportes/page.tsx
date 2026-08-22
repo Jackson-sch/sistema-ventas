@@ -5,7 +5,6 @@ import {
   FileSpreadsheet,
   Download,
   Search,
-  Filter,
   Calendar,
   DollarSign,
   TrendingUp,
@@ -13,17 +12,29 @@ import {
   ShieldCheck,
   Building2,
   FileText,
-  Layers,
-  ArrowUpRight,
   CheckCircle2,
-  AlertCircle,
-  HelpCircle,
+  Package,
+  Layers,
+  RefreshCw,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { getSireSalesData, SireSaleRecord } from "@/actions/reports-actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  getSireSalesData,
+  getReportsProfitabilityDataAction,
+  SireSaleRecord,
+  CategoryProfitabilityRecord,
+  ProductTurnoverRecord,
+} from "@/actions/reports-actions";
 
 export default function ReportesPage() {
   const [records, setRecords] = useState<SireSaleRecord[]>([]);
@@ -35,16 +46,26 @@ export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState<"sire" | "rentabilidad">("sire");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const [categoriesProfitability, setCategoriesProfitability] = useState<CategoryProfitabilityRecord[]>([]);
+  const [topRotationProducts, setTopRotationProducts] = useState<ProductTurnoverRecord[]>([]);
+
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const data = await getSireSalesData(selectedPeriod);
-        if (data && data.length > 0) {
-          setRecords(data);
+        const [dataSire, dataProfit] = await Promise.all([
+          getSireSalesData(selectedPeriod),
+          getReportsProfitabilityDataAction(),
+        ]);
+        if (dataSire && dataSire.length > 0) {
+          setRecords(dataSire);
+        }
+        if (dataProfit) {
+          setCategoriesProfitability(dataProfit.categories);
+          setTopRotationProducts(dataProfit.topProducts);
         }
       } catch (err) {
-        console.error("Error loading SIRE data:", err);
+        console.error("Error loading reports data:", err);
       } finally {
         setIsLoading(false);
       }
@@ -304,29 +325,55 @@ export default function ReportesPage() {
                 />
               </div>
 
-              <select
-                value={filterDocType}
-                onChange={(e) => {
-                  setFilterDocType(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">Todos los Comprobantes</option>
-                <option value="03">03 — Boletas de Venta</option>
-                <option value="01">01 — Facturas</option>
-                <option value="07">07 — Notas de Crédito</option>
-              </select>
+              <div className="w-48">
+                <Select
+                  value={filterDocType}
+                  onValueChange={(val) => {
+                    setFilterDocType(val);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full h-9 rounded-xl bg-slate-950/90 border-slate-800 text-xs text-slate-200">
+                    <SelectValue placeholder="Tipo Comprobante" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50">
+                    <SelectItem value="all" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      Todos los Comprobantes
+                    </SelectItem>
+                    <SelectItem value="03" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      03 — Boletas de Venta
+                    </SelectItem>
+                    <SelectItem value="01" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      01 — Facturas
+                    </SelectItem>
+                    <SelectItem value="07" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      07 — Notas de Crédito
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-slate-300 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="202608">Periodo: Agosto 2026</option>
-                <option value="202607">Periodo: Julio 2026</option>
-                <option value="202606">Periodo: Junio 2026</option>
-              </select>
+              <div className="w-48">
+                <Select
+                  value={selectedPeriod}
+                  onValueChange={(val) => setSelectedPeriod(val)}
+                >
+                  <SelectTrigger className="w-full h-9 rounded-xl bg-slate-950/90 border-slate-800 text-xs text-slate-200 font-mono">
+                    <SelectValue placeholder="Periodo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-2xl rounded-xl z-50 font-mono">
+                    <SelectItem value="202608" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      Periodo: Agosto 2026
+                    </SelectItem>
+                    <SelectItem value="202607" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      Periodo: Julio 2026
+                    </SelectItem>
+                    <SelectItem value="202606" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                      Periodo: Junio 2026
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="text-xs text-slate-400 font-mono">
@@ -352,46 +399,62 @@ export default function ReportesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
-                {paginated.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="py-3 px-3 text-slate-400">{r.cuo}</td>
-                    <td className="py-3 px-3 text-slate-300">{r.fechaEmision}</td>
-                    <td className="py-3 px-3">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 font-bold text-[10px] text-blue-400">
-                        {r.tipoComprobante === "01" ? "01 FAC" : r.tipoComprobante === "07" ? "07 NC" : "03 BOL"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-bold text-white">
-                      {r.serie}-{r.numero}
-                    </td>
-                    <td className="py-3 px-3 text-slate-300">
-                      {r.tipoDocCliente === "6" ? "RUC: " : "DNI: "}{r.numDocCliente}
-                    </td>
-                    <td className="py-3 px-3 text-slate-200 font-sans truncate max-w-[200px]">
-                      {r.razonSocialCliente}
-                    </td>
-                    <td className="py-3 px-3 text-right text-slate-300">
-                      {formatCurrency(r.baseImponibleGravada)}
-                    </td>
-                    <td className="py-3 px-3 text-right text-purple-400 font-bold">
-                      {formatCurrency(r.igv)}
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-emerald-400">
-                      {formatCurrency(r.montoTotal)}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      {r.estadoComprobante === "1" ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 text-[10px] font-bold border border-emerald-800/50">
-                          Aceptado
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-400 text-[10px] font-bold border border-rose-800/50">
-                          Anulado
-                        </span>
-                      )}
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={10} className="py-12 text-center text-slate-400">
+                      <RefreshCw className="size-6 animate-spin mx-auto mb-2 text-blue-400" />
+                      Consultando registros de ventas en PostgreSQL...
                     </td>
                   </tr>
-                ))}
+                ) : paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-12 text-center text-slate-500 font-sans">
+                      <Package className="size-8 mx-auto stroke-[1.2] opacity-30 text-slate-400 mb-2" />
+                      No se encontraron comprobantes para el periodo y filtros seleccionados.
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="py-3 px-3 text-slate-400">{r.cuo}</td>
+                      <td className="py-3 px-3 text-slate-300">{r.fechaEmision}</td>
+                      <td className="py-3 px-3">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 font-bold text-[10px] text-blue-400">
+                          {r.tipoComprobante === "01" ? "01 FAC" : r.tipoComprobante === "07" ? "07 NC" : "03 BOL"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 font-bold text-white">
+                        {r.serie}-{r.numero}
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">
+                        {r.tipoDocCliente === "6" ? "RUC: " : "DNI: "}{r.numDocCliente}
+                      </td>
+                      <td className="py-3 px-3 text-slate-200 font-sans truncate max-w-[200px]">
+                        {r.razonSocialCliente}
+                      </td>
+                      <td className="py-3 px-3 text-right text-slate-300">
+                        {formatCurrency(r.baseImponibleGravada)}
+                      </td>
+                      <td className="py-3 px-3 text-right text-purple-400 font-bold">
+                        {formatCurrency(r.igv)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-emerald-400">
+                        {formatCurrency(r.montoTotal)}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        {r.estadoComprobante === "1" ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 text-[10px] font-bold border border-emerald-800/50">
+                            Aceptado
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-400 text-[10px] font-bold border border-rose-800/50">
+                            Anulado
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -416,13 +479,7 @@ export default function ReportesPage() {
             </h3>
 
             <div className="space-y-3">
-              {[
-                { name: "Lácteos & Huevos", ventas: 14500, costo: 11200, margen: 22.8 },
-                { name: "Abarrotes & Despensa", ventas: 28900, costo: 23100, margen: 20.1 },
-                { name: "Frutas & Verduras", ventas: 9800, costo: 6400, margen: 34.7 },
-                { name: "Limpieza & Hogar", ventas: 11200, costo: 8100, margen: 27.6 },
-                { name: "Bebidas & Licores", ventas: 16400, costo: 12100, margen: 26.2 },
-              ].map((cat) => (
+              {categoriesProfitability.map((cat) => (
                 <div key={cat.name} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-white">{cat.name}</span>
@@ -431,12 +488,12 @@ export default function ReportesPage() {
                   <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-blue-500 to-emerald-500 h-full rounded-full"
-                      style={{ width: `${cat.margen * 2.5}%` }}
+                      style={{ width: `${Math.min(100, cat.margen * 2.5)}%` }}
                     ></div>
                   </div>
                   <div className="flex justify-between text-[10px] text-slate-500 font-mono">
                     <span>Ventas: {formatCurrency(cat.ventas)}</span>
-                    <span>Ganancia: {formatCurrency(cat.ventas - cat.costo)}</span>
+                    <span>Ganancia: {formatCurrency(cat.ganancia)}</span>
                   </div>
                 </div>
               ))}
@@ -449,13 +506,7 @@ export default function ReportesPage() {
             </h3>
 
             <div className="space-y-3">
-              {[
-                { rank: "1", name: "Leche Gloria Entera 400g", sku: "GLO-001", und: "1,420 und", total: 6390.00 },
-                { rank: "2", name: "Arroz Costeño Extra 1kg", sku: "COS-001", und: "980 und", total: 5096.00 },
-                { rank: "3", name: "Aceite Primor Premium 1L", sku: "PRI-001", und: "740 und", total: 7252.00 },
-                { rank: "4", name: "Detergente Bolívar Floral 1kg", sku: "BOL-001", und: "520 und", total: 4420.00 },
-                { rank: "5", name: "Manzana Delicia Nacional", sku: "MAN-001", und: "890 kg", total: 4272.00 },
-              ].map((p) => (
+              {topRotationProducts.map((p) => (
                 <div key={p.rank} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="size-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-blue-400 text-xs">
