@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -28,6 +28,7 @@ import {
   CheckCheck,
   Filter,
   RefreshCw,
+  Folder,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState, parseAsString } from "nuqs";
@@ -394,14 +395,15 @@ export default function PermisosPage() {
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {filteredCategories.map((category) => (
-                  <div key={category.id} className="contents">
+                  <Fragment key={category.id}>
                     {/* Category Divider Header */}
                     <tr className="bg-slate-900/60 border-y border-slate-800">
                       <td
                         colSpan={2 + data.roles.length}
-                        className="py-2.5 px-5 text-xs font-black text-indigo-300 uppercase tracking-wider"
+                        className="py-2.5 px-5 text-xs font-black text-indigo-300 uppercase tracking-wider flex items-center gap-1.5"
                       >
-                        📁 {category.name} ({category.permissions.length} privilegios)
+                        <Folder className="size-3.5 text-indigo-400" />
+                        <span>{category.name} ({category.permissions.length} privilegios)</span>
                       </td>
                     </tr>
 
@@ -463,7 +465,7 @@ export default function PermisosPage() {
                         })}
                       </tr>
                     ))}
-                  </div>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
