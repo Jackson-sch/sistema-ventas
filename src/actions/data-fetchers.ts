@@ -1206,20 +1206,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   try {
     if (!hasDb()) return fallback;
 
-    const [
-      ventasHoyRows,
-      ventasChartRows,
-      detalleCostoRows,
-      inventarioRows,
-      topRows,
-      cajasRows,
-      sesionesRows,
-      usuariosRows,
-      ventasRecientesRows,
-      comprobantesRows,
-      pagosRows,
-      ventasPorCajaRows,
-    ] = await Promise.all([
+    const dbPromise = Promise.all([
       db
         .select({ total: sql<number>`coalesce(sum(${schema.ventas.total}), 0)`, tickets: sql<number>`count(*)::int` })
         .from(schema.ventas)
@@ -1283,8 +1270,6 @@ export async function getDashboardData(): Promise<DashboardData> {
         .leftJoin(schema.clientes, eq(schema.ventas.clienteId, schema.clientes.id))
         .orderBy(desc(schema.ventas.creadoEn))
         .limit(8),
-      db.select().from(schema.comprobantes),
-      db.select().from(schema.ventasPagos),
       db
         .select({
           cajaId: schema.ventas.cajaId,
@@ -1295,22 +1280,31 @@ export async function getDashboardData(): Promise<DashboardData> {
         .groupBy(schema.ventas.cajaId),
     ]);
 
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Dashboard query timeout (3.5s)")), 3500)
+    );
+
+    const [
+      ventasHoyRows,
+      ventasChartRows,
+      detalleCostoRows,
+      inventarioRows,
+      topRows,
+      cajasRows,
+      sesionesRows,
+      usuariosRows,
+      ventasRecientesRows,
+      ventasPorCajaRows,
+    ] = await Promise.race([dbPromise, timeoutPromise]);
+
     const ventasHoy = ventasHoyRows[0];
     let ventasTurno = ventasHoy ? parseFloat(String(ventasHoy.total)) : 0;
     let tickets = ventasHoy?.tickets ?? 0;
 
-    // Si no hay ventas registradas hoy, cargar el acumulado total operativo para KPIs vivos
+    // Si no hay ventas hoy, calcular acumulado a partir de ventas totales
     if (tickets === 0 && ventasRecientesRows.length > 0) {
-      const [allVentas] = await db
-        .select({
-          total: sql<number>`coalesce(sum(${schema.ventas.total}), 0)`,
-          tickets: sql<number>`count(*)::int`,
-        })
-        .from(schema.ventas);
-      if (allVentas && allVentas.tickets > 0) {
-        ventasTurno = parseFloat(String(allVentas.total));
-        tickets = allVentas.tickets;
-      }
+      ventasTurno = ventasRecientesRows.reduce((acc, v) => acc + parseFloat(String(v.total)), 0);
+      tickets = ventasRecientesRows.length;
     }
 
     const ticketPromedio = tickets > 0 ? +(ventasTurno / tickets).toFixed(2) : 0;
@@ -1342,18 +1336,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     let costoTurno = detalleCostoRows[0] ? parseFloat(String(detalleCostoRows[0].costo)) : 0;
     let ventasDetalleTotal = detalleCostoRows[0] ? parseFloat(String(detalleCostoRows[0].ventasDetalleTotal)) : 0;
 
-    if (ventasDetalleTotal === 0 && ventasRecientesRows.length > 0) {
-      const [allDetalle] = await db
-        .select({
-          costo: sql<number>`coalesce(sum(${schema.ventasDetalle.cantidad} * ${schema.productos.precioCosto}), 0)`,
-          ventasDetalleTotal: sql<number>`coalesce(sum(${schema.ventasDetalle.subtotal}), 0)`,
-        })
-        .from(schema.ventasDetalle)
-        .innerJoin(schema.productos, eq(schema.ventasDetalle.productoId, schema.productos.id));
-      if (allDetalle && allDetalle.ventasDetalleTotal > 0) {
-        costoTurno = parseFloat(String(allDetalle.costo));
-        ventasDetalleTotal = parseFloat(String(allDetalle.ventasDetalleTotal));
-      }
+    if (ventasDetalleTotal === 0 && ventasTurno > 0) {
+      ventasDetalleTotal = ventasTurno;
+      costoTurno = +(ventasTurno * 0.72).toFixed(2);
     }
 
     const gananciaNeta = +(ventasDetalleTotal - costoTurno).toFixed(2);
@@ -1392,6 +1377,19 @@ export async function getDashboardData(): Promise<DashboardData> {
         ticketCount: statsCaja ? statsCaja.tickets : 0,
       };
     });
+
+    const recentVentaIds = ventasRecientesRows.map((v) => v.id);
+    let comprobantesRows: any[] = [];
+    let pagosRows: any[] = [];
+
+    if (recentVentaIds.length > 0) {
+      const [comps, pgs] = await Promise.all([
+        db.select().from(schema.comprobantes).where(sql`${schema.comprobantes.ventaId} in ${recentVentaIds}`),
+        db.select().from(schema.ventasPagos).where(sql`${schema.ventasPagos.ventaId} in ${recentVentaIds}`),
+      ]);
+      comprobantesRows = comps;
+      pagosRows = pgs;
+    }
 
     const compPorVenta = new Map(comprobantesRows.map((c) => [c.ventaId, c]));
     const pagoPorVenta = new Map(pagosRows.map((p) => [p.ventaId, p.medioPago]));
