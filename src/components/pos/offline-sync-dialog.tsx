@@ -109,12 +109,13 @@ export function OfflineSyncDialog({ isOpen, onClose }: OfflineSyncDialogProps) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${
                   isOnline
                     ? "bg-emerald-950/80 text-emerald-400 border-emerald-800/50"
                     : "bg-rose-950/80 text-rose-400 border-rose-800/50"
                 }`}>
-                  {isOnline ? "🟢 Conectado a Internet" : "🔴 Modo Sin Conexión (Offline)"}
+                  <span className={`size-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
+                  {isOnline ? "Conectado a Internet" : "Modo Sin Conexión (Offline)"}
                 </span>
               </div>
               <h3 className="text-base font-extrabold text-white tracking-tight mt-0.5">

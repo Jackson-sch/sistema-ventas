@@ -16,28 +16,20 @@ import {
   RotateCcw,
   Sparkles,
   Printer,
-  Percent,
-  Layers,
-  HelpCircle,
-  Building2,
   Lock,
   Clock,
-  ArrowDownRight,
   ArrowUpRight,
   Calculator,
-  ShieldCheck,
   Award,
   Scale,
-  Wifi,
   ArrowRightLeft,
-  Gift,
   Tag,
   Monitor,
-  PauseCircle,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { CashOpeningDialog } from "@/components/pos/cash-opening-dialog";
 import { CashMovementDialog } from "@/components/pos/cash-movement-dialog";
 import { CashClosingDialog } from "@/components/pos/cash-closing-dialog";
@@ -1050,7 +1042,11 @@ export default function PosPage() {
                         Resultados encontrados: <strong className="text-white font-bold">{filteredSearchResults.length}</strong>
                       </span>
                       <span className="text-slate-500 flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-bold">⬆ ⬇ Navegar</span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-bold flex items-center gap-0.5">
+                          <ArrowUp className="size-2.5" />
+                          <ArrowDown className="size-2.5" />
+                          <span>Navegar</span>
+                        </span>
                         <span className="px-1.5 py-0.5 rounded bg-blue-600/30 text-blue-300 border border-blue-500/30 font-mono font-bold">↵ Enter Seleccionar</span>
                         <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Esc</span>
                       </span>
@@ -1344,7 +1340,7 @@ export default function PosPage() {
                   }`}
                 >
                   <Banknote className="size-4 shrink-0 text-emerald-400" />
-                  <span>💵 Efectivo</span>
+                  <span>Efectivo</span>
                 </button>
                 <button
                   type="button"
@@ -1356,7 +1352,7 @@ export default function PosPage() {
                   }`}
                 >
                   <CreditCard className="size-4 shrink-0 text-blue-400" />
-                  <span>💳 Tarjeta</span>
+                  <span>Tarjeta</span>
                 </button>
                 <button
                   type="button"
@@ -1368,7 +1364,7 @@ export default function PosPage() {
                   }`}
                 >
                   <QrCode className="size-4 shrink-0 text-purple-400" />
-                  <span>🟣 Yape/Plin</span>
+                  <span>Yape / Plin</span>
                 </button>
                 <button
                   type="button"
@@ -1395,7 +1391,7 @@ export default function PosPage() {
                   }`}
                 >
                   <CreditCard className="size-4 shrink-0 text-rose-400" />
-                  <span>📋 Crédito / Fiado</span>
+                  <span>Crédito / Fiado</span>
                 </button>
                 <button
                   type="button"
@@ -1410,7 +1406,7 @@ export default function PosPage() {
                   }`}
                 >
                   <ArrowRightLeft className="size-4 shrink-0 text-amber-400" />
-                  <span>🔀 Cobro Mixto</span>
+                  <span>Cobro Mixto</span>
                 </button>
               </div>
             </div>

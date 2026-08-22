@@ -165,8 +165,18 @@ export function ScaleDialog({
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className={`size-2.5 rounded-full ${isStable ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}></span>
-              <span className="text-slate-300 font-bold text-[11px]">
-                {isStable ? "⚖️ PESO ESTABLE" : "🔄 LEYENDO BALANZA..."}
+              <span className="text-slate-300 font-bold text-[11px] flex items-center gap-1.5">
+                {isStable ? (
+                  <>
+                    <Scale className="size-3.5 text-emerald-400" />
+                    <span>PESO ESTABLE</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="size-3.5 text-amber-400 animate-spin" />
+                    <span>LEYENDO BALANZA...</span>
+                  </>
+                )}
               </span>
             </div>
             <span className="text-[11px] text-slate-400 font-mono">

@@ -13,10 +13,18 @@ import {
   Calculator,
   Percent,
   Sparkles,
+  Building2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { SplitPaymentInput } from "@/actions/pos-actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SplitPaymentDialogProps {
   isOpen: boolean;
@@ -169,17 +177,46 @@ export function SplitPaymentDialog({
                   <span className="size-6 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-xs font-bold font-mono">
                     #{idx + 1}
                   </span>
-                  <select
+                  <Select
                     value={p.medioPago}
-                    onChange={(e) => handleUpdatePayment(idx, "medioPago", e.target.value)}
-                    className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    onValueChange={(val) => handleUpdatePayment(idx, "medioPago", val)}
                   >
-                    <option value="efectivo">💵 Efectivo</option>
-                    <option value="tarjeta">💳 Tarjeta (POS)</option>
-                    <option value="yape">🟣 Yape</option>
-                    <option value="plin">🔵 Plin</option>
-                    <option value="transferencia">🏦 Transferencia</option>
-                  </select>
+                    <SelectTrigger className="h-8 px-2.5 rounded-xl bg-slate-900 border-slate-800 text-xs font-bold text-white focus:ring-1 focus:ring-blue-500 w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 shadow-xl rounded-xl z-50">
+                      <SelectItem value="efectivo" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="size-3.5 text-emerald-400" />
+                          <span>Efectivo</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="tarjeta" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="size-3.5 text-blue-400" />
+                          <span>Tarjeta (POS)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="yape" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        <div className="flex items-center gap-2">
+                          <QrCode className="size-3.5 text-purple-400" />
+                          <span>Yape</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="plin" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        <div className="flex items-center gap-2">
+                          <QrCode className="size-3.5 text-cyan-400" />
+                          <span>Plin</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="transferencia" className="text-xs cursor-pointer focus:bg-blue-600/20 focus:text-blue-300">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="size-3.5 text-amber-400" />
+                          <span>Transferencia</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center gap-2">
