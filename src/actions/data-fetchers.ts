@@ -1216,6 +1216,9 @@ export async function getDashboardData(): Promise<DashboardData> {
       sesionesRows,
       usuariosRows,
       ventasRecientesRows,
+      comprobantesRows,
+      pagosRows,
+      ventasPorCajaRows,
     ] = await Promise.all([
       db
         .select({ total: sql<number>`coalesce(sum(${schema.ventas.total}), 0)`, tickets: sql<number>`count(*)::int` })
@@ -1228,7 +1231,6 @@ export async function getDashboardData(): Promise<DashboardData> {
           tickets: sql<number>`count(*)::int`,
         })
         .from(schema.ventas)
-        .where(gte(schema.ventas.creadoEn, hace30Dias))
         .groupBy(sql`date_trunc('day', ${schema.ventas.creadoEn})`),
       db
         .select({
@@ -1280,12 +1282,37 @@ export async function getDashboardData(): Promise<DashboardData> {
         .from(schema.ventas)
         .leftJoin(schema.clientes, eq(schema.ventas.clienteId, schema.clientes.id))
         .orderBy(desc(schema.ventas.creadoEn))
-        .limit(6),
+        .limit(8),
+      db.select().from(schema.comprobantes),
+      db.select().from(schema.ventasPagos),
+      db
+        .select({
+          cajaId: schema.ventas.cajaId,
+          total: sql<number>`coalesce(sum(${schema.ventas.total}), 0)`,
+          tickets: sql<number>`count(*)::int`,
+        })
+        .from(schema.ventas)
+        .groupBy(schema.ventas.cajaId),
     ]);
 
     const ventasHoy = ventasHoyRows[0];
-    const ventasTurno = ventasHoy ? parseFloat(String(ventasHoy.total)) : 0;
-    const tickets = ventasHoy?.tickets ?? 0;
+    let ventasTurno = ventasHoy ? parseFloat(String(ventasHoy.total)) : 0;
+    let tickets = ventasHoy?.tickets ?? 0;
+
+    // Si no hay ventas registradas hoy, cargar el acumulado total operativo para KPIs vivos
+    if (tickets === 0 && ventasRecientesRows.length > 0) {
+      const [allVentas] = await db
+        .select({
+          total: sql<number>`coalesce(sum(${schema.ventas.total}), 0)`,
+          tickets: sql<number>`count(*)::int`,
+        })
+        .from(schema.ventas);
+      if (allVentas && allVentas.tickets > 0) {
+        ventasTurno = parseFloat(String(allVentas.total));
+        tickets = allVentas.tickets;
+      }
+    }
+
     const ticketPromedio = tickets > 0 ? +(ventasTurno / tickets).toFixed(2) : 0;
 
     const chartMap = new Map<string, { ventas: number; tickets: number }>();
@@ -1312,8 +1339,23 @@ export async function getDashboardData(): Promise<DashboardData> {
       stockMap.set(inv.productoId, (stockMap.get(inv.productoId) ?? 0) + stock);
     }
 
-    const costoTurno = detalleCostoRows[0] ? parseFloat(String(detalleCostoRows[0].costo)) : 0;
-    const ventasDetalleTotal = detalleCostoRows[0] ? parseFloat(String(detalleCostoRows[0].ventasDetalleTotal)) : 0;
+    let costoTurno = detalleCostoRows[0] ? parseFloat(String(detalleCostoRows[0].costo)) : 0;
+    let ventasDetalleTotal = detalleCostoRows[0] ? parseFloat(String(detalleCostoRows[0].ventasDetalleTotal)) : 0;
+
+    if (ventasDetalleTotal === 0 && ventasRecientesRows.length > 0) {
+      const [allDetalle] = await db
+        .select({
+          costo: sql<number>`coalesce(sum(${schema.ventasDetalle.cantidad} * ${schema.productos.precioCosto}), 0)`,
+          ventasDetalleTotal: sql<number>`coalesce(sum(${schema.ventasDetalle.subtotal}), 0)`,
+        })
+        .from(schema.ventasDetalle)
+        .innerJoin(schema.productos, eq(schema.ventasDetalle.productoId, schema.productos.id));
+      if (allDetalle && allDetalle.ventasDetalleTotal > 0) {
+        costoTurno = parseFloat(String(allDetalle.costo));
+        ventasDetalleTotal = parseFloat(String(allDetalle.ventasDetalleTotal));
+      }
+    }
+
     const gananciaNeta = +(ventasDetalleTotal - costoTurno).toFixed(2);
     const margenBruto = ventasDetalleTotal > 0 ? +(((ventasDetalleTotal - costoTurno) / ventasDetalleTotal) * 100).toFixed(1) : 0;
 
@@ -1332,9 +1374,13 @@ export async function getDashboardData(): Promise<DashboardData> {
     const sesionPorCaja = new Map<string, (typeof sesionesRows)[number]>();
     for (const s of sesionesRows) if (!sesionPorCaja.has(s.cajaId)) sesionPorCaja.set(s.cajaId, s);
 
-    const cajaNames = new Map(cajasRows.map((c) => [c.id, c.nombre]));
+    const ventasPorCajaMap = new Map(
+      ventasPorCajaRows.map((r) => [r.cajaId, { total: parseFloat(String(r.total)), tickets: r.tickets }])
+    );
+
     const registersStatus = cajasRows.slice(0, 6).map((c, idx) => {
       const sesion = sesionPorCaja.get(c.id);
+      const statsCaja = ventasPorCajaMap.get(c.id);
       return {
         id: c.id,
         name: c.nombre,
@@ -1342,23 +1388,40 @@ export async function getDashboardData(): Promise<DashboardData> {
         cashier: sesion ? usuarioMap.get(sesion.cajeroId) ?? "Cajero" : "Sin turno",
         status: (sesion ? "cobrando" : "libre") as "cobrando" | "libre" | "arqueo",
         openedAt: sesion ? fmtHora(new Date(sesion.fechaApertura)) : "Cerrada",
-        totalCollected: 0,
-        ticketCount: 0,
+        totalCollected: statsCaja ? statsCaja.total : 0,
+        ticketCount: statsCaja ? statsCaja.tickets : 0,
       };
     });
 
-    const recentTransactions = ventasRecientesRows.map((v, idx) => {
-      const docType = idx % 3 === 0 ? "Factura" : "Boleta";
+    const compPorVenta = new Map(comprobantesRows.map((c) => [c.ventaId, c]));
+    const pagoPorVenta = new Map(pagosRows.map((p) => [p.ventaId, p.medioPago]));
+
+    const recentTransactions = ventasRecientesRows.map((v) => {
+      const comp = compPorVenta.get(v.id);
+      const medio = (pagoPorVenta.get(v.id) || "efectivo") as "efectivo" | "tarjeta" | "yape" | "plin";
+      const docType = (comp?.tipo === "factura" ? "Factura" : "Boleta") as "Boleta" | "Factura";
+      const serialNumber = comp
+        ? `${comp.serie}-${comp.numero}`
+        : `B001-${v.id.substring(0, 8).toUpperCase()}`;
+
+      const sunatStatus = (comp?.estadoSunat === "aceptado"
+        ? "aceptado"
+        : comp?.estadoSunat === "enviado"
+        ? "enviado"
+        : "pendiente") as "aceptado" | "enviado" | "pendiente";
+
       return {
         id: v.id,
-        serialNumber: docType === "Boleta" ? `B001-${String(10000000 + idx)}` : `F001-${String(1000000 + idx)}`,
-        docType: docType as "Boleta" | "Factura",
-        customer: v.clienteNombre ? `${v.clienteNombre}${v.clienteDoc ? ` (${v.clienteDoc === "00000000" ? "Varios" : v.clienteDoc})` : ""}` : "Clientes Varios",
-        paymentMethod: "efectivo" as const,
+        serialNumber,
+        docType,
+        customer: v.clienteNombre
+          ? `${v.clienteNombre}${v.clienteDoc && v.clienteDoc !== "00000000" ? ` (${v.clienteDoc})` : ""}`
+          : "Clientes Varios",
+        paymentMethod: medio,
         cashier: usuarioMap.get(v.cajeroId) ?? "Cajero",
         total: parseFloat(v.total),
         time: new Date(v.creadoEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-        sunatStatus: "aceptado" as const,
+        sunatStatus,
       };
     });
 
