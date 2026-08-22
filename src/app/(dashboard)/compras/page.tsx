@@ -121,13 +121,6 @@ export default function ComprasPage() {
     toast.success(`Proveedor "${saved.razonSocial}" guardado exitosamente.`);
   };
 
-  const handleSavePurchase = (saved: PurchaseRecord) => {
-    setPurchases((prev) => [saved, ...prev]);
-    toast.success(`¡Mercadería ingresada al almacén con éxito!`, {
-      description: `Factura ${saved.numeroFactura} de ${saved.proveedorNombre} por ${formatCurrency(saved.total)}. Kardex actualizado.`,
-    });
-  };
-
   const handleOpenEditSupplier = (s: SupplierData) => {
     setEditingSupplier(s);
     setIsSupplierOpen(true);
@@ -409,7 +402,8 @@ export default function ComprasPage() {
       <PurchaseFormDialog
         isOpen={isPurchaseOpen}
         onClose={() => setIsPurchaseOpen(false)}
-        onSave={handleSavePurchase}
+        availableSuppliers={suppliers}
+        onSuccess={() => loadData(false)}
       />
 
       {/* Delete Confirmation Modal */}

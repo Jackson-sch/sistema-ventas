@@ -467,6 +467,161 @@ export async function updatePurchaseOrderStatusAction(
   }
 }
 
+export async function registerDirectPurchaseAction(input: {
+  numeroFactura: string;
+  proveedorId: string;
+  proveedorRuc: string;
+  proveedorRazonSocial: string;
+  condicionPago: string;
+  fechaEmision?: string;
+  items: {
+    productoId: string;
+    sku: string;
+    nombre: string;
+    cantidad: number;
+    costoUnitario: number;
+    lote?: string;
+    fechaVencimiento?: string;
+  }[];
+}): Promise<{ success: boolean; error?: string }> {
+  if (!input.items || input.items.length === 0) {
+    return { success: false, error: "Debe agregar al menos un producto a la compra." };
+  }
+
+  try {
+    const ctx = await getDevContext();
+    const orderId = crypto.randomUUID();
+    const recepcionId = crypto.randomUUID();
+    const today = input.fechaEmision || new Date().toISOString().slice(0, 10);
+
+    let targetProveedorId = input.proveedorId;
+    if (!targetProveedorId || targetProveedorId.startsWith("prov-")) {
+      const [existingProv] = await db
+        .select()
+        .from(schema.proveedores)
+        .where(eq(schema.proveedores.ruc, input.proveedorRuc))
+        .limit(1);
+
+      if (existingProv) {
+        targetProveedorId = existingProv.id;
+      } else {
+        const newProvId = crypto.randomUUID();
+        await db.insert(schema.proveedores).values({
+          id: newProvId,
+          tenantId: ctx.tenantId,
+          razonSocial: input.proveedorRazonSocial,
+          ruc: input.proveedorRuc,
+          contactoNombre: "Departamento Comercial",
+          contactoTelefono: "999999999",
+          contactoEmail: "ventas@proveedor.pe",
+        });
+        targetProveedorId = newProvId;
+      }
+    }
+
+    await db.transaction(async (tx) => {
+      // 1. Create Purchase Order in recibida_completa state
+      await tx.insert(schema.ordenesCompra).values({
+        id: orderId,
+        tenantId: ctx.tenantId,
+        sucursalId: ctx.sucursalId,
+        proveedorId: targetProveedorId,
+        estado: "recibida_completa",
+        numero: input.numeroFactura,
+        fechaEmision: today,
+        fechaEntregaEstimada: today,
+        observaciones: `Compra directa y recepción en almacén. Factura: ${input.numeroFactura}`,
+        creadoPor: ctx.cajeroId,
+      });
+
+      // 2. Insert Reception
+      await tx.insert(schema.recepcionesMercaderia).values({
+        id: recepcionId,
+        ordenCompraId: orderId,
+        numeroGuiaRemision: input.numeroFactura,
+        recibidoPor: ctx.cajeroId,
+        observaciones: `Recepción inmediata - Factura: ${input.numeroFactura}`,
+      });
+
+      // 3. For each item: detail, lote, kardex, and inventory update
+      for (const item of input.items) {
+        if (item.cantidad <= 0) continue;
+
+        // Detail
+        await tx.insert(schema.ordenesCompraDetalle).values({
+          ordenCompraId: orderId,
+          productoId: item.productoId,
+          cantidadPedida: item.cantidad.toFixed(3),
+          cantidadRecibida: item.cantidad.toFixed(3),
+          precioUnitarioCosto: item.costoUnitario.toFixed(2),
+        });
+
+        // Lote
+        const loteId = crypto.randomUUID();
+        await tx.insert(schema.lotes).values({
+          id: loteId,
+          productoId: item.productoId,
+          sucursalId: ctx.sucursalId,
+          numeroLote: item.lote || `L-${new Date().getFullYear()}-${Math.floor(Math.random() * 900 + 100)}`,
+          fechaVencimiento: item.fechaVencimiento || "2027-12-31",
+          cantidadInicial: item.cantidad.toFixed(3),
+          cantidadActual: item.cantidad.toFixed(3),
+        });
+
+        // Recepcion detalle
+        await tx.insert(schema.recepcionesMercaderiaDetalle).values({
+          recepcionId,
+          productoId: item.productoId,
+          cantidadRecibida: item.cantidad.toFixed(3),
+          loteId,
+        });
+
+        // Kardex
+        const kardexId = crypto.randomUUID();
+        await tx.insert(schema.movimientosInventario).values({
+          id: kardexId,
+          tenantId: ctx.tenantId,
+          sucursalId: ctx.sucursalId,
+          productoId: item.productoId,
+          loteId,
+          tipo: "ingreso",
+          cantidad: item.cantidad.toFixed(3),
+          motivo: `Compra Directa Factura [${input.numeroFactura}]`,
+          referenciaTipo: "orden_compra",
+          referenciaId: orderId,
+          usuarioId: ctx.cajeroId,
+        });
+
+        // Inventory Stock Update
+        await tx
+          .insert(schema.inventario)
+          .values({
+            productoId: item.productoId,
+            sucursalId: ctx.sucursalId,
+            stockActual: item.cantidad.toFixed(3),
+            stockMinimo: "5.000",
+          })
+          .onConflictDoUpdate({
+            target: [schema.inventario.productoId, schema.inventario.sucursalId],
+            set: {
+              stockActual: sql`${schema.inventario.stockActual} + ${item.cantidad}`,
+              actualizadoEn: new Date(),
+            },
+          });
+      }
+    });
+
+    revalidatePath("/compras");
+    revalidatePath("/compras/ordenes");
+    revalidatePath("/inventario");
+    revalidatePath("/inventario/kardex");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in registerDirectPurchaseAction:", error);
+    return { success: false, error: error.message || "Error al registrar la compra." };
+  }
+}
+
 export async function deletePurchaseOrderAction(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
