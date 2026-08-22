@@ -2,8 +2,7 @@
 
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { sql } from "drizzle-orm";
 import { getDevContext, ensureSesionAbierta } from "./context";
 import { getNextCorrelativoNumber } from "./series-actions";
 import { buildUblXml, SunatDocumentData } from "@/lib/sunat";
@@ -68,7 +67,25 @@ export async function completeSaleTransactionAction(
 
     const isFactura = input.docType === "factura";
     const tipoDocSunat = isFactura ? "01" : "03";
-    const correlativoInfo = await getNextCorrelativoNumber(tipoDocSunat, ctx.tenantId);
+    const databaseConfigured = Boolean(
+      process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")
+    );
+    const missingSkuItems = input.items.filter((item) => !item.id || item.id.length !== 36);
+
+    // Estas tres operaciones no dependen entre sí. Iniciarlas juntas evita sumar
+    // su latencia de red antes de abrir la transacción de venta.
+    const correlativoPromise = getNextCorrelativoNumber(tipoDocSunat, ctx.tenantId);
+    const sesionCajaPromise = databaseConfigured
+      ? ensureSesionAbierta(ctx.cajaId, ctx.cajeroId)
+      : null;
+    const productsPromise = databaseConfigured && missingSkuItems.length > 0
+      ? db
+          .select({ id: schema.productos.id, sku: schema.productos.sku })
+          .from(schema.productos)
+          .where(sql`${schema.productos.sku} IN ${missingSkuItems.map((item) => item.sku)}`)
+      : null;
+
+    const correlativoInfo = await correlativoPromise;
     const serie = correlativoInfo.serie;
     const numeroConsecutivo = correlativoInfo.numero;
     const serieNumero = correlativoInfo.serieNumero;
@@ -143,27 +160,21 @@ export async function completeSaleTransactionAction(
           ];
 
     // Database Atomic Transaction (if DB available)
-    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
+    if (databaseConfigured) {
       try {
-        const sesionCajaId = await ensureSesionAbierta(ctx.cajaId, ctx.cajeroId);
+        const [sesionCajaId, dbProducts] = await Promise.all([
+          sesionCajaPromise!,
+          productsPromise ?? Promise.resolve([]),
+        ]);
 
-        // Fetch only missing product UUIDs if any
-        const missingSkuItems = input.items.filter((i) => !i.id || i.id.length !== 36);
         const skuToIdMap = new Map<string, string>();
-        if (missingSkuItems.length > 0) {
-          const skus = missingSkuItems.map((i) => i.sku);
-          const dbProducts = await db
-            .select({ id: schema.productos.id, sku: schema.productos.sku })
-            .from(schema.productos)
-            .where(sql`${schema.productos.sku} IN ${skus}`);
-          for (const p of dbProducts) {
-            skuToIdMap.set(p.sku.toLowerCase(), p.id);
-          }
+        for (const product of dbProducts) {
+          skuToIdMap.set(product.sku.toLowerCase(), product.id);
         }
 
         const detalleValues: any[] = [];
         const kardexValues: any[] = [];
-        const stockUpdates: { prodId: string; cantidad: number }[] = [];
+        const stockByProduct = new Map<string, number>();
 
         for (const item of input.items) {
           const validProdId =
@@ -191,7 +202,10 @@ export async function completeSaleTransactionAction(
               usuarioId: ctx.cajeroId,
             });
 
-            stockUpdates.push({ prodId: validProdId, cantidad: item.cantidad });
+            stockByProduct.set(
+              validProdId,
+              (stockByProduct.get(validProdId) ?? 0) + item.cantidad
+            );
           }
         }
 
@@ -234,19 +248,22 @@ export async function completeSaleTransactionAction(
             await tx.insert(schema.movimientosInventario).values(kardexValues);
           }
 
-          // 5. Parallel Stock Decrement
-          if (stockUpdates.length > 0) {
-            await Promise.all(
-              stockUpdates.map((u) =>
-                tx
-                  .update(schema.inventario)
-                  .set({
-                    stockActual: sql`GREATEST(0, ${schema.inventario.stockActual} - ${u.cantidad})`,
-                    actualizadoEn: new Date(),
-                  })
-                  .where(eq(schema.inventario.productoId, u.prodId))
-              )
+          // 5. Un solo UPDATE para todo el carrito. Agrupar también evita
+          // bloquear repetidamente el mismo producto cuando aparece dos veces.
+          if (stockByProduct.size > 0) {
+            const stockValues = Array.from(stockByProduct, ([productoId, cantidad]) =>
+              sql`(${productoId}::uuid, ${cantidad}::numeric)`
             );
+
+            await tx.execute(sql`
+              UPDATE "inventario" AS inventory
+              SET
+                "stock_actual" = GREATEST(0, inventory."stock_actual" - updates.cantidad),
+                "actualizado_en" = NOW()
+              FROM (VALUES ${sql.join(stockValues, sql`, `)}) AS updates(producto_id, cantidad)
+              WHERE inventory."producto_id" = updates.producto_id
+                AND inventory."sucursal_id" = ${ctx.sucursalId}::uuid
+            `);
           }
 
           // 6. Insert Comprobante Electrónico
@@ -307,13 +324,6 @@ export async function completeSaleTransactionAction(
           error: dbErr instanceof Error ? dbErr.message : "Error al registrar la venta en base de datos.",
         };
       }
-    }
-
-    try {
-      revalidatePath("/pos");
-      revalidatePath("/ventas");
-    } catch {
-      // Ignorar si se ejecuta fuera de contexto HTTP Next.js
     }
 
     const ticketData: TicketData = {

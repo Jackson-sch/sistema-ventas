@@ -294,7 +294,6 @@ export async function getNextCorrelativoNumber(
 ): Promise<{ serie: string; numero: number; serieNumero: string }> {
   try {
     if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
-      // Buscar serie activa preferida o la principal
       const condition = seriePreferida
         ? and(
             eq(schema.seriesComprobantes.tenantId, tenantId),
@@ -309,23 +308,23 @@ export async function getNextCorrelativoNumber(
             eq(schema.seriesComprobantes.activo, true)
           );
 
-      const [serieRow] = await db.select().from(schema.seriesComprobantes).where(condition).limit(1);
+      const [updated] = await db
+        .update(schema.seriesComprobantes)
+        .set({
+          correlativoActual: sql`${schema.seriesComprobantes.correlativoActual} + 1`,
+          actualizadoEn: new Date(),
+        })
+        .where(condition)
+        .returning({
+          serie: schema.seriesComprobantes.serie,
+          numero: schema.seriesComprobantes.correlativoActual,
+        });
 
-      if (serieRow) {
-        const nextNum = serieRow.correlativoActual + 1;
-        // Incrementar correlativo actual en la BD
-        await db
-          .update(schema.seriesComprobantes)
-          .set({
-            correlativoActual: nextNum,
-            actualizadoEn: new Date(),
-          })
-          .where(eq(schema.seriesComprobantes.id, serieRow.id));
-
+      if (updated) {
         return {
-          serie: serieRow.serie,
-          numero: nextNum,
-          serieNumero: `${serieRow.serie}-${nextNum.toString().padStart(8, "0")}`,
+          serie: updated.serie,
+          numero: updated.numero,
+          serieNumero: `${updated.serie}-${updated.numero.toString().padStart(8, "0")}`,
         };
       }
     }
