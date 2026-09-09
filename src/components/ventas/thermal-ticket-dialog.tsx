@@ -4,38 +4,32 @@ import { useRef } from "react";
 import {
   Printer,
   Download,
-  QrCode,
-  CheckCircle2,
+  FileCode2,
+  Receipt,
   FileText,
   Building2,
-  Phone,
-  MapPin,
-  ShieldCheck,
-  Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { SunatQrCode } from "@/components/ui/sunat-qr-code";
-
-export interface TicketPaymentItem {
-  medio: string;
-  monto: number;
-  referencia?: string;
-  montoRecibido?: number;
-  vuelto?: number;
-}
+import {
+  downloadCpeXml,
+  downloadCpeCdr,
+  downloadTicketPdfFromElement,
+} from "@/lib/cpe-downloader";
 
 export interface TicketData {
-  comprobante: string;
-  tipo: "Boleta" | "Factura" | "Nota de Crédito";
+  comprobante: string; // ej: B001-00000124
+  tipo: string; // Boleta, Factura, Nota de Crédito
   fecha: string;
   hora: string;
   caja: string;
   cajero: string;
-  cliente: {
+  cliente?: {
     nombre: string;
-    documentoTipo: "DNI" | "RUC" | "VARIOS";
-    documentoNumero: string;
+    documentoTipo?: string;
+    documentoNumero?: string;
     direccion?: string;
   };
   items: {
@@ -43,10 +37,14 @@ export interface TicketData {
     descripcion: string;
     precioUnit: number;
     total: number;
-    unidad: string;
+    unidad?: string;
   }[];
-  medioPago: "efectivo" | "tarjeta" | "yape" | "plin" | "mixto" | "credito";
-  pagos?: TicketPaymentItem[];
+  medioPago: string;
+  pagos?: {
+    medio: string;
+    monto: number;
+    referencia?: string;
+  }[];
   montoRecibido?: number;
   vuelto?: number;
   total: number;
@@ -79,12 +77,18 @@ export function ThermalTicketDialog({
     window.print();
   };
 
-  const handleDownloadPdf = () => {
-    toast.success(`Descargando comprobante en PDF: ${ticket.comprobante}.pdf`);
+  const handleDownloadPdf = async () => {
+    if (printRef.current) {
+      await downloadTicketPdfFromElement(printRef.current, ticket.comprobante);
+    }
   };
 
   const handleDownloadXml = () => {
-    toast.success(`Descargando archivo XML firmado por SUNAT: ${ticket.comprobante}.xml`);
+    downloadCpeXml(ticket);
+  };
+
+  const handleDownloadCdr = () => {
+    downloadCpeCdr(ticket);
   };
 
   return (
@@ -97,22 +101,22 @@ export function ThermalTicketDialog({
               <Printer className="size-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white tracking-tight">Simulador de Ticket Térmico 80mm</h3>
-              <p className="text-[11px] text-slate-400 font-mono">Protocolo ESC/POS — Epson & Bixolon</p>
+              <h3 className="text-sm font-bold text-white tracking-tight">Comprobante de Pago Electrónico</h3>
+              <p className="text-[11px] text-slate-400 font-mono">Impresión térmica 80mm & Descargas Tributarias</p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleDownloadPdf}
-              title="Descargar PDF"
-              className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Descargar PDF (Ticket 80mm)"
+              className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <Download className="size-3.5" />
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition-all cursor-pointer"
             >
               <Printer className="size-3" /> Imprimir
             </button>
@@ -133,130 +137,138 @@ export function ThermalTicketDialog({
             {/* Store Fiscal Header */}
             <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-400">
               <div className="text-base font-black tracking-wider uppercase">NOVAMARKET SUPERMERCADOS</div>
-              <div className="text-[11px] font-bold text-slate-700">R.U.C. 20608945123</div>
-              <div className="text-[10px] text-slate-600 leading-tight">
-                AV. JAVIER PRADO ESTE 4200 - SURCO - LIMA
-              </div>
-              <div className="text-[10px] text-slate-600">TEL: (01) 619-8000</div>
-              <div className="text-[10px] font-semibold text-slate-800 uppercase mt-1">
-                SUCURSAL CENTRAL (TIENDA 01)
-              </div>
+              <div className="text-[10px] text-slate-600 font-bold">NOVAMARKET SUPERMERCADOS S.A.C.</div>
+              <div className="text-[10px] text-slate-600 font-bold">RUC: 20608945123</div>
+              <div className="text-[9px] text-slate-500">AV. PRINCIPAL 123 - SURCO, LIMA</div>
+              <div className="text-[9px] text-slate-500">TEL: (01) 748-9000</div>
             </div>
 
-            {/* Document Header */}
-            <div className="text-center py-2.5 border-b border-dashed border-slate-400 space-y-0.5">
-              <div className="text-xs font-black uppercase tracking-wide">
+            {/* Document Details */}
+            <div className="py-2.5 border-b border-dashed border-slate-400 space-y-1 text-[11px]">
+              <div className="text-center font-black text-sm uppercase py-0.5">
                 {ticket.tipo.toUpperCase()} ELECTRÓNICA
               </div>
-              <div className="text-sm font-black tracking-tight text-black">{ticket.comprobante}</div>
-            </div>
-
-            {/* Transaction Metadata */}
-            <div className="py-2.5 text-[10px] space-y-1 border-b border-dashed border-slate-400">
-              <div className="flex justify-between">
+              <div className="text-center font-extrabold text-sm tracking-widest text-black">
+                {ticket.comprobante}
+              </div>
+              <div className="flex justify-between pt-1 text-[10px] text-slate-600">
                 <span>FECHA: {ticket.fecha}</span>
                 <span>HORA: {ticket.hora}</span>
               </div>
+              <div className="flex justify-between text-[10px] text-slate-600">
+                <span>CAJA: {ticket.caja}</span>
+                <span>CAJERO: {ticket.cajero}</span>
+              </div>
+            </div>
+
+            {/* Customer Details */}
+            <div className="py-2 border-b border-dashed border-slate-400 space-y-0.5 text-[10px]">
               <div className="flex justify-between">
-                <span>CAJA: {ticket.caja || "Caja 01 - Principal"}</span>
-                <span>CAJERO: {ticket.cajero || "Admin General"}</span>
-              </div>
-              <div className="pt-1">
-                <div>CLIENTE: <strong className="uppercase">{ticket.cliente?.nombre || "CLIENTES VARIOS"}</strong></div>
-                <div>
-                  {(ticket.cliente?.documentoTipo === "VARIOS" || !ticket.cliente?.documentoTipo
-                    ? (ticket.cliente?.documentoNumero?.length === 11 ? "RUC" : "DNI")
-                    : ticket.cliente.documentoTipo)}: {ticket.cliente?.documentoNumero || "00000000"}
-                </div>
-                {ticket.cliente?.direccion && <div>DIR: {ticket.cliente.direccion}</div>}
-              </div>
-            </div>
-
-            {/* Itemized Table */}
-            <div className="py-2.5 border-b border-dashed border-slate-400 space-y-1.5 text-[10px]">
-              <div className="flex justify-between font-bold pb-1 border-b border-slate-300 uppercase">
-                <span className="w-8">CANT</span>
-                <span className="flex-1 px-1">DESCRIPCIÓN</span>
-                <span className="w-12 text-right">P.U.</span>
-                <span className="w-14 text-right">TOTAL</span>
-              </div>
-
-              {(ticket.items || []).map((item, idx) => (
-                <div key={idx} className="flex justify-between items-baseline leading-snug">
-                  <span className="w-8 font-semibold">{item.cantidad} {item.unidad}</span>
-                  <span className="flex-1 px-1 truncate uppercase font-bold">{item.descripcion}</span>
-                  <span className="w-12 text-right">{(item.precioUnit || 0).toFixed(2)}</span>
-                  <span className="w-14 text-right font-black">{(item.total || 0).toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Financial Totals */}
-            <div className="py-2.5 border-b border-dashed border-slate-400 space-y-1 text-[11px]">
-              <div className="flex justify-between text-slate-700">
-                <span>OP. GRAVADA:</span>
-                <span>S/ {subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-700">
-                <span>I.G.V. (18%):</span>
-                <span>S/ {igv.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-black text-sm pt-1 border-t border-slate-300">
-                <span>TOTAL A PAGAR:</span>
-                <span className="text-base">S/ {totalAbs.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* Payment Details (Single or Multi/Split Payments) */}
-            <div className="py-2 border-b border-dashed border-slate-400 text-[10px] space-y-1">
-              <div className="flex justify-between">
-                <span>FORMA DE PAGO:</span>
-                <span className="font-bold uppercase">
-                  {ticket.pagos && ticket.pagos.length > 1 ? "PAGO MIXTO / DIVIDIDO" : ticket.medioPago}
+                <span className="font-bold text-slate-700">CLIENTE:</span>
+                <span className="font-semibold truncate max-w-[200px] text-right">
+                  {ticket.cliente?.nombre || "CLIENTES VARIOS"}
                 </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-slate-700">
+                  {ticket.cliente?.documentoTipo || (ticket.tipo === "Factura" ? "RUC" : "DNI/DOC")}:
+                </span>
+                <span className="font-mono">{ticket.cliente?.documentoNumero || "00000000"}</span>
+              </div>
+              {ticket.cliente?.direccion && (
+                <div className="text-[9px] text-slate-500 truncate">
+                  DIR: {ticket.cliente.direccion}
+                </div>
+              )}
+            </div>
+
+            {/* Items Table */}
+            <div className="py-2.5 border-b border-dashed border-slate-400">
+              <div className="grid grid-cols-12 font-black text-[10px] pb-1 border-b border-slate-300 text-slate-700">
+                <span className="col-span-2">CANT</span>
+                <span className="col-span-6">DESCRIPCIÓN</span>
+                <span className="col-span-2 text-right">P.UNIT</span>
+                <span className="col-span-2 text-right">TOTAL</span>
+              </div>
+              <div className="space-y-1.5 pt-1.5 text-[10px]">
+                {ticket.items.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-12 leading-tight">
+                    <span className="col-span-2 font-bold">
+                      {item.cantidad} {item.unidad || "und"}
+                    </span>
+                    <span className="col-span-6 truncate font-medium">{item.descripcion}</span>
+                    <span className="col-span-2 text-right text-slate-600">
+                      {item.precioUnit.toFixed(2)}
+                    </span>
+                    <span className="col-span-2 text-right font-black text-black">
+                      {item.total.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Totals & Breakdown */}
+            <div className="py-2.5 border-b border-dashed border-slate-400 space-y-1 text-[11px]">
+              <div className="flex justify-between text-slate-600">
+                <span>OP. GRAVADA (Subtotal):</span>
+                <span className="font-mono font-bold">{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>I.G.V. (18%):</span>
+                <span className="font-mono font-bold">{formatCurrency(igv)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>OP. EXONERADA / INAFECTA:</span>
+                <span className="font-mono font-bold">S/ 0.00</span>
+              </div>
+              <div className="flex justify-between text-base font-black text-black pt-1 border-t border-slate-300">
+                <span>IMPORTE TOTAL:</span>
+                <span className="font-mono">{formatCurrency(ticket.total)}</span>
+              </div>
+            </div>
+
+            {/* Payment Info */}
+            <div className="py-2 border-b border-dashed border-slate-400 space-y-0.5 text-[10px] text-slate-600">
+              <div className="flex justify-between font-semibold">
+                <span className="uppercase">FORMA DE PAGO:</span>
+                <span className="font-bold text-black uppercase">{ticket.medioPago}</span>
               </div>
 
               {ticket.pagos && ticket.pagos.length > 0 ? (
-                <div className="space-y-1 pt-1 border-t border-dotted border-slate-300">
+                <div className="space-y-0.5 pt-1 border-t border-slate-200">
                   {ticket.pagos.map((p, idx) => (
-                    <div key={idx} className="space-y-0.5">
-                      <div className="flex justify-between text-slate-800">
-                        <span>• {p.medio.toUpperCase()}{p.referencia ? ` (Ref: ${p.referencia})` : ""}:</span>
-                        <span className="font-bold">S/ {p.monto.toFixed(2)}</span>
-                      </div>
-                      {p.medio.toLowerCase() === "efectivo" && p.montoRecibido && p.montoRecibido > p.monto && (
-                        <div className="flex justify-between text-[9px] text-slate-600 pl-2">
-                          <span>RECIBIDO: S/ {p.montoRecibido.toFixed(2)}</span>
-                          <span>VUELTO: S/ {(p.vuelto || 0).toFixed(2)}</span>
-                        </div>
-                      )}
+                    <div key={idx} className="flex justify-between text-[9px]">
+                      <span className="uppercase text-slate-500">
+                        • {p.medio} {p.referencia ? `(${p.referencia})` : ""}:
+                      </span>
+                      <span className="font-mono font-bold">{formatCurrency(p.monto)}</span>
                     </div>
                   ))}
                 </div>
-              ) : ticket.medioPago === "efectivo" && ticket.montoRecibido ? (
+              ) : ticket.medioPago === "efectivo" ? (
                 <>
                   <div className="flex justify-between">
                     <span>IMPORTE RECIBIDO:</span>
-                    <span>S/ {ticket.montoRecibido.toFixed(2)}</span>
+                    <span className="font-mono font-bold text-black">
+                      {formatCurrency(ticket.montoRecibido || ticket.total)}
+                    </span>
                   </div>
-                  <div className="flex justify-between font-bold">
-                    <span>VUELTO:</span>
-                    <span>S/ {(ticket.vuelto || 0).toFixed(2)}</span>
+                  <div className="flex justify-between font-bold text-black">
+                    <span>VUELTO ENTREGADO:</span>
+                    <span className="font-mono">{formatCurrency(ticket.vuelto || 0)}</span>
                   </div>
                 </>
               ) : null}
             </div>
 
-            {/* Official SUNAT Footer & QR Representation */}
-            <div className="pt-3 text-center space-y-2 text-[9px] text-slate-600">
-              <div className="flex justify-center my-1">
-                <div className="p-1.5 bg-white border border-slate-300 rounded shadow-sm">
-                  <SunatQrCode
-                    value={`20608945123|${ticket.tipo === "Factura" ? "01" : ticket.tipo === "Nota de Crédito" ? "07" : "03"}|${ticket.comprobante.split("-")[0] || "B001"}|${ticket.comprobante.split("-")[1] || "00000001"}|${igv.toFixed(2)}|${totalAbs.toFixed(2)}|${ticket.fecha}|${ticket.cliente.documentoTipo === "RUC" ? "6" : "1"}|${ticket.cliente.documentoNumero}|${ticket.hashSunat}|`}
-                    size={80}
-                    alt={`QR SUNAT ${ticket.comprobante}`}
-                  />
-                </div>
+            {/* Legal Fiscal Footer & QR Code */}
+            <div className="pt-3 text-center space-y-2">
+              <div className="flex justify-center p-1 bg-white rounded border border-slate-300 w-fit mx-auto">
+                <SunatQrCode
+                  value={`20608945123|${ticket.tipo === "Factura" ? "01" : ticket.tipo === "Nota de Crédito" ? "07" : "03"}|${ticket.comprobante.split("-")[0] || "B001"}|${ticket.comprobante.split("-")[1] || "1"}|${igv.toFixed(2)}|${totalAbs.toFixed(2)}|${ticket.fecha}|${ticket.cliente?.documentoTipo || "1"}|${ticket.cliente?.documentoNumero || "00000000"}|${ticket.hashSunat}|`}
+                  size={90}
+                />
               </div>
               <div className="font-mono font-semibold text-[8px] break-all text-slate-500">
                 CÓDIGO HASH: {ticket.hashSunat}
@@ -272,19 +284,36 @@ export function ThermalTicketDialog({
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="flex items-center justify-between pt-2">
-          <button
-            type="button"
-            onClick={handleDownloadXml}
-            className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1"
-          >
-            <FileText className="size-3.5" /> Descargar XML / CDR SUNAT
-          </button>
+        {/* Modal Footer with Real Downloads */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="size-3.5 text-blue-400" /> PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadXml}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <FileCode2 className="size-3.5 text-purple-400" /> XML UBL 2.1
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadCdr}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Receipt className="size-3.5 text-emerald-400" /> CDR SUNAT
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             Cerrar
           </button>

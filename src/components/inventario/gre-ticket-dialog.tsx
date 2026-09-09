@@ -43,7 +43,49 @@ export function GreTicketDialog({
   };
 
   const handleDownloadXml = () => {
-    toast.success(`Descargando XML UBL 2.1 oficial firmado: ${transfer.codigoGuia}.xml`);
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<DespatchAdvice xmlns="urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+  xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>2.0</cbc:CustomizationID>
+  <cbc:ID>${transfer.codigoGuia}</cbc:ID>
+  <cbc:IssueDate>${transfer.fechaSalida || new Date().toISOString().split("T")[0]}</cbc:IssueDate>
+  <cbc:DespatchAdviceTypeCode>09</cbc:DespatchAdviceTypeCode>
+  <cac:DespatchSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification><cbc:ID schemeID="6">20608945123</cbc:ID></cac:PartyIdentification>
+      <cac:PartyLegalEntity><cbc:RegistrationName>NOVAMARKET SUPERMERCADOS S.A.C.</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DespatchSupplierParty>
+  <cac:DeliveryCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification><cbc:ID schemeID="6">20608945123</cbc:ID></cac:PartyIdentification>
+      <cac:PartyLegalEntity><cbc:RegistrationName>NOVAMARKET - ${transfer.sucursalDestino}</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DeliveryCustomerParty>
+  <cac:Shipment>
+    <cbc:ID>1</cbc:ID>
+    <cbc:GrossWeightMeasure unitCode="KGM">${transfer.pesoBrutoKgm || 10}</cbc:GrossWeightMeasure>
+    <cac:Delivery>
+      <cac:DeliveryAddress>
+        <cbc:StreetName>Av. Principal 123 - Sede Destino</cbc:StreetName>
+      </cac:DeliveryAddress>
+    </cac:Delivery>
+  </cac:Shipment>
+</DespatchAdvice>`;
+
+    const blob = new Blob([xmlContent], { type: "application/xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `20608945123-09-${transfer.codigoGuia}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`XML UBL 2.1 oficial descargado: ${transfer.codigoGuia}.xml`);
   };
 
   return (

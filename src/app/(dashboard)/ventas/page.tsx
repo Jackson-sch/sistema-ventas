@@ -24,10 +24,10 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { ThermalTicketDialog, TicketData } from "@/components/ventas/thermal-ticket-dialog";
 import { CreditNoteDialog } from "@/components/ventas/credit-note-dialog";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { downloadCpeXml, downloadCpeCdr } from "@/lib/cpe-downloader";
 import { getSalesHistoryData } from "@/actions/data-fetchers";
 
 interface SaleRecord {
@@ -176,7 +176,13 @@ export default function VentasPage() {
         hora: ticketData.hora,
         estadoSunat: "aceptado",
         hashSunat: ticketData.hashSunat,
-        items: ticketData.items,
+        items: (ticketData.items || []).map((it) => ({
+          cantidad: it.cantidad,
+          descripcion: it.descripcion,
+          precioUnit: it.precioUnit,
+          total: it.total,
+          unidad: it.unidad || "NIU",
+        })),
       };
 
       setSales((prev) => [newNC, ...prev]);
@@ -185,8 +191,33 @@ export default function VentasPage() {
     }
   };
 
-  const handleDownloadXml = (comprobante: string) => {
-    toast.success(`Descargando XML y CDR oficial de SUNAT para: ${comprobante}`);
+  const handleDownloadXml = (sale: SaleRecord) => {
+    downloadCpeXml({
+      comprobante: sale.comprobante,
+      tipo: sale.tipo,
+      fecha: sale.fecha,
+      hora: sale.hora,
+      caja: sale.caja,
+      cajero: sale.cajero,
+      cliente: {
+        nombre: sale.cliente,
+        documentoNumero: sale.docNumero,
+      },
+      items: sale.items,
+      medioPago: sale.medioPago,
+      total: sale.total,
+      hashSunat: sale.hashSunat,
+    });
+  };
+
+  const handleDownloadCdr = (sale: SaleRecord) => {
+    downloadCpeCdr({
+      comprobante: sale.comprobante,
+      tipo: sale.tipo,
+      fecha: sale.fecha,
+      hora: sale.hora,
+      hashSunat: sale.hashSunat,
+    });
   };
 
   return (
@@ -419,13 +450,22 @@ export default function VentasPage() {
                       <Eye className="size-3.5" />
                     </button>
 
-                    {/* Descargar XML / CDR */}
+                    {/* Descargar XML UBL 2.1 */}
                     <button
-                      onClick={() => handleDownloadXml(sale.comprobante)}
-                      title="Descargar XML / CDR SUNAT"
-                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors"
+                      onClick={() => handleDownloadXml(sale)}
+                      title="Descargar XML UBL 2.1 Oficial"
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     >
                       <FileCode2 className="size-3.5" />
+                    </button>
+
+                    {/* Descargar CDR SUNAT */}
+                    <button
+                      onClick={() => handleDownloadCdr(sale)}
+                      title="Descargar Constancia de Recepción (CDR)"
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-purple-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <ShieldCheck className="size-3.5" />
                     </button>
 
                     {/* Emitir Nota de Crédito (solo si no es NC ni está anulado) */}

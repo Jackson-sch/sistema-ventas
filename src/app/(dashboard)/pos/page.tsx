@@ -472,7 +472,7 @@ export default function PosPage() {
           tipoDoc: res.ticketData.comprobante.startsWith("B") ? "BOLETA DE VENTA ELECTRÓNICA" : "FACTURA ELECTRÓNICA",
           fechaEmision: `${res.ticketData.fecha} ${res.ticketData.hora}`,
           cliente: { tipoDoc: docType.toUpperCase(), numDoc: customerDoc, nombre: customerName },
-          items: res.ticketData.items.map((it) => ({ descripcion: it.descripcion, cantidad: it.cantidad, unidad: it.unidad, precioUnitario: it.precioUnit, total: it.total })),
+          items: res.ticketData.items.map((it) => ({ descripcion: it.descripcion, cantidad: it.cantidad, unidad: it.unidad || "NIU", precioUnitario: it.precioUnit, total: it.total })),
           totales: { opGravada: subtotal, opExonerada: 0, opInafecta: 0, igv, descuentoTotal: promoSavings + pointsDiscount, total },
           pagos: [{ medio: selectedPayment, monto: total }],
           vuelto: change,
