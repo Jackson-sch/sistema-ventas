@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { PosClient } from "./types";
 import { SplitPaymentInput } from "@/actions/pos-actions";
 import { CustomerCreditAccount } from "@/actions/customer-credit-actions";
+import { POS_DEFAULTS } from "@/lib/constants";
 
 interface PosCheckoutSidebarProps {
   cartLength: number;
@@ -56,7 +57,7 @@ interface PosCheckoutSidebarProps {
   onCheckout: () => void;
 }
 
-const QUICK_AMOUNTS = [10, 20, 50, 100, 200];
+
 
 export function PosCheckoutSidebar({
   cartLength,
@@ -371,7 +372,7 @@ export function PosCheckoutSidebar({
             </div>
 
             <div className="flex items-center gap-1.5 pt-1">
-              {QUICK_AMOUNTS.map((amt) => (
+              {POS_DEFAULTS.quickAmounts.map((amt) => (
                 <button
                   key={amt}
                   type="button"

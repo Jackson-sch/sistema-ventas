@@ -182,7 +182,50 @@ export async function lookupIdentityAction(
     console.warn("Error en consulta local de cliente:", err);
   }
 
-  // 3. Nivel 2: Consulta vía API REST Externa (si está configurado el Token)
+  // 3. Nivel 2: Consulta vía Microservicio sunat-billing-api (Bun)
+  try {
+    const sunatApiUrl = process.env.SUNAT_API_URL || "http://localhost:3001";
+    const apiKey = process.env.SUNAT_API_KEY || "novamarket_secret_api_key_2026";
+    const endpoint = tipoDoc === "RUC" ? `${sunatApiUrl}/api/v1/consultas/ruc` : `${sunatApiUrl}/api/v1/consultas/dni`;
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify(tipoDoc === "RUC" ? { ruc: cleanDoc } : { dni: cleanDoc }),
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.found) {
+        return {
+          success: true,
+          found: true,
+          tipoDoc,
+          numDoc: cleanDoc,
+          nombreRazonSocial: json.nombreRazonSocial || json.nombreCompleto || "",
+          nombres: json.nombres,
+          apellidoPaterno: json.apellidoPaterno,
+          apellidoMaterno: json.apellidoMaterno,
+          estado: json.estado || "ACTIVO",
+          condicion: json.condicion || "HABIDO",
+          direccionFiscal: json.direccionFiscal,
+          departamento: json.departamento,
+          provincia: json.provincia,
+          distrito: json.distrito,
+          ubigeo: json.ubigeo,
+          isFromCache: json.isFromCache ?? false,
+        };
+      }
+    }
+  } catch (apiErr) {
+    // Si la API de Bun está temporalmente apagada, continúa al fallback local sin interrumpir al usuario
+  }
+
+  // 4. Nivel 3: Consulta vía Proveedor Externo Secundario (si configurado)
   const apiToken = process.env.SUNAT_API_TOKEN || process.env.APIPERU_TOKEN;
   if (apiToken) {
     try {

@@ -1,24 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition, useMemo } from "react";
-import {
-  ShoppingCart,
-  Plus,
-  Trash2,
-  Search,
-  Barcode,
-  Package,
-  CheckCircle2,
-  X,
-  Loader2,
-  Building2,
-  User,
-  Phone,
-  Mail,
-  Calendar,
-  DollarSign,
-} from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { ShoppingCart, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   createPurchaseOrderAction,
@@ -28,14 +11,11 @@ import {
   searchProductsAction,
   ProductSearchResult,
 } from "@/actions/inventory-actions";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+
+import { OrdeneSupplierForm } from "@/components/compras/ordenes/dialog/ordene-supplier-form";
+import { OrdeneProductPicker } from "@/components/compras/ordenes/dialog/ordene-product-picker";
+import { OrdeneFooter } from "@/components/compras/ordenes/dialog/ordene-footer";
 
 interface SupplierItem {
   id: string;
@@ -51,6 +31,15 @@ interface OrdenesFormDialogProps {
   onClose: () => void;
   availableSuppliers: SupplierItem[];
   onSuccess: () => void;
+}
+
+interface OrderItem {
+  productoId: string;
+  sku: string;
+  nombre: string;
+  cantidadPedida: number;
+  costoUnitario: number;
+  total: number;
 }
 
 export function OrdenesFormDialog({
@@ -81,16 +70,7 @@ export function OrdenesFormDialog({
   const [deliveryDate, setDeliveryDate] = useState("");
   const [currency, setCurrency] = useState<"PEN" | "USD">("PEN");
   const [observaciones, setObservaciones] = useState("Entrega regular en muelle de recepción de almacén.");
-  const [items, setItems] = useState<
-    {
-      productoId: string;
-      sku: string;
-      nombre: string;
-      cantidadPedida: number;
-      costoUnitario: number;
-      total: number;
-    }[]
-  >([]);
+  const [items, setItems] = useState<OrderItem[]>([]);
 
   // Product Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -107,10 +87,7 @@ export function OrdenesFormDialog({
   // Click outside listener for dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
-      ) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     }
@@ -121,14 +98,12 @@ export function OrdenesFormDialog({
   // Live search
   useEffect(() => {
     if (!isOpen) return;
-
     const timer = setTimeout(() => {
       startSearchTransition(async () => {
         const results = await searchProductsAction(searchQuery, 10);
         setSearchResults(results);
       });
     }, 200);
-
     return () => clearTimeout(timer);
   }, [searchQuery, isOpen]);
 
@@ -151,7 +126,6 @@ export function OrdenesFormDialog({
         setSupplierPhone("");
         setSupplierEmail("");
       }
-
       setPaymentCondition("CREDITO_30D");
       setCurrency("PEN");
       setObservaciones("Entrega regular en muelle de recepción de almacén.");
@@ -197,28 +171,20 @@ export function OrdenesFormDialog({
       toast.error("Busque y seleccione un producto primero.");
       return;
     }
-
     const qty = parseFloat(inputQty) || 0;
     const cost = parseFloat(inputCost) || 0;
     if (qty <= 0 || cost <= 0) {
       toast.error("La cantidad y costo deben ser mayores a cero.");
       return;
     }
-
     const total = +(qty * cost).toFixed(2);
-
     const existingIndex = items.findIndex((i) => i.productoId === selectedProd.id);
     if (existingIndex >= 0) {
       setItems((prev) =>
         prev.map((it, idx) => {
           if (idx !== existingIndex) return it;
           const newQty = it.cantidadPedida + qty;
-          return {
-            ...it,
-            cantidadPedida: newQty,
-            costoUnitario: cost,
-            total: +(newQty * cost).toFixed(2),
-          };
+          return { ...it, cantidadPedida: newQty, costoUnitario: cost, total: +(newQty * cost).toFixed(2) };
         })
       );
     } else {
@@ -234,7 +200,6 @@ export function OrdenesFormDialog({
         },
       ]);
     }
-
     setSelectedProd(null);
     setInputQty("10");
     toast.success(`"${selectedProd.nombre}" agregado al pedido.`);
@@ -247,6 +212,7 @@ export function OrdenesFormDialog({
   const subtotal = +items.reduce((acc, i) => acc + i.total, 0).toFixed(2);
   const igv = +(subtotal * 0.18).toFixed(2);
   const total = +(subtotal + igv).toFixed(2);
+  const currencySymbol = currency === "USD" ? "$ " : "S/ ";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,7 +224,6 @@ export function OrdenesFormDialog({
       toast.error("Debe agregar al menos un producto a la orden de compra.");
       return;
     }
-
     setIsSubmitting(true);
     try {
       const res = await createPurchaseOrderAction({
@@ -274,7 +239,6 @@ export function OrdenesFormDialog({
         observaciones,
         items,
       });
-
       if (res.success) {
         toast.success("¡Orden de compra generada exitosamente en PostgreSQL!");
         onClose();
@@ -322,370 +286,59 @@ export function OrdenesFormDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Supplier Selection Card */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <Building2 className="size-3.5" /> Datos del Proveedor
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {uniqueSuppliers.length} proveedores registrados
-              </span>
-            </div>
+          <OrdeneSupplierForm
+            uniqueSuppliers={uniqueSuppliers}
+            selectedSupplierId={selectedSupplierId}
+            onSupplierSelect={handleSupplierSelect}
+            supplierRuc={supplierRuc}
+            onSupplierRucChange={setSupplierRuc}
+            supplierName={supplierName}
+            onSupplierNameChange={setSupplierName}
+            supplierContact={supplierContact}
+            onSupplierContactChange={setSupplierContact}
+            supplierPhone={supplierPhone}
+            onSupplierPhoneChange={setSupplierPhone}
+            supplierEmail={supplierEmail}
+            onSupplierEmailChange={setSupplierEmail}
+            paymentCondition={paymentCondition}
+            onPaymentConditionChange={setPaymentCondition}
+            currency={currency}
+            onCurrencyChange={setCurrency}
+            deliveryDate={deliveryDate}
+            onDeliveryDateChange={setDeliveryDate}
+          />
 
-            {uniqueSuppliers.length > 0 && (
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
-                  Seleccionar del Directorio de Proveedores
-                </label>
-                <Select value={selectedSupplierId} onValueChange={handleSupplierSelect}>
-                  <SelectTrigger className="w-full h-10 rounded-xl bg-slate-900 border-slate-700 text-xs text-white focus:ring-1 focus:ring-amber-500 font-semibold">
-                    <SelectValue placeholder="Seleccione un proveedor..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-50 max-h-60">
-                    {uniqueSuppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id} className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                        <div className="flex items-center justify-between gap-3 w-full">
-                          <span className="font-bold">{s.razonSocial}</span>
-                          <span className="text-slate-400 font-mono text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded">
-                            RUC: {s.ruc}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          <OrdeneProductPicker
+            items={items}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            searchResults={searchResults}
+            isSearching={isSearching}
+            isDropdownOpen={isDropdownOpen}
+            onDropdownOpenChange={setIsDropdownOpen}
+            selectedProd={selectedProd}
+            onSelectProduct={handleSelectProduct}
+            onClearSelectedProd={() => setSelectedProd(null)}
+            inputQty={inputQty}
+            onInputQtyChange={setInputQty}
+            inputCost={inputCost}
+            onInputCostChange={setInputCost}
+            onAddItem={handleAddItem}
+            onRemoveItem={handleRemoveItem}
+            searchContainerRef={searchContainerRef}
+          />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
-                  RUC del Proveedor
-                </label>
-                <input
-                  type="text"
-                  value={supplierRuc}
-                  onChange={(e) => setSupplierRuc(e.target.value)}
-                  placeholder="20XXXXXXXXX"
-                  className="w-full h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono font-bold"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
-                  Razón Social
-                </label>
-                <input
-                  type="text"
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  placeholder="Nombre de la empresa"
-                  className="w-full h-9 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Optional Supplier Contacts Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-[11px]">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
-                <User className="size-3 text-slate-500 shrink-0" />
-                <input
-                  type="text"
-                  value={supplierContact}
-                  onChange={(e) => setSupplierContact(e.target.value)}
-                  placeholder="Contacto Comercial"
-                  className="bg-transparent border-none outline-none w-full text-xs placeholder:text-slate-600"
-                />
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
-                <Phone className="size-3 text-slate-500 shrink-0" />
-                <input
-                  type="text"
-                  value={supplierPhone}
-                  onChange={(e) => setSupplierPhone(e.target.value)}
-                  placeholder="Teléfono"
-                  className="bg-transparent border-none outline-none w-full text-xs font-mono placeholder:text-slate-600"
-                />
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
-                <Mail className="size-3 text-slate-500 shrink-0" />
-                <input
-                  type="email"
-                  value={supplierEmail}
-                  onChange={(e) => setSupplierEmail(e.target.value)}
-                  placeholder="Email Pedidos"
-                  className="bg-transparent border-none outline-none w-full text-xs placeholder:text-slate-600"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Conditions & Dates */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
-                Condición de Pago
-              </label>
-              <Select value={paymentCondition} onValueChange={(v: any) => setPaymentCondition(v)}>
-                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-950/80 border-slate-800 text-xs text-white focus:ring-1 focus:ring-amber-500">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-50">
-                  <SelectItem value="CONTADO" className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                    Contado / Anticipado
-                  </SelectItem>
-                  <SelectItem value="CREDITO_15D" className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                    Crédito 15 días
-                  </SelectItem>
-                  <SelectItem value="CREDITO_30D" className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                    Crédito 30 días
-                  </SelectItem>
-                  <SelectItem value="CREDITO_60D" className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                    Crédito 60 días
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
-                Moneda
-              </label>
-              <Select value={currency} onValueChange={(v: any) => setCurrency(v)}>
-                <SelectTrigger className="w-full h-9 rounded-xl bg-slate-950/80 border-slate-800 text-xs text-white focus:ring-1 focus:ring-amber-500">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 shadow-2xl rounded-xl z-50">
-                  <SelectItem value="PEN" className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                    Soles (PEN S/)
-                  </SelectItem>
-                  <SelectItem value="USD" className="text-xs cursor-pointer focus:bg-amber-600/20 focus:text-amber-300">
-                    Dólares (USD $)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
-                Fecha Estimada de Entrega
-              </label>
-              <div className="relative">
-                <Calendar className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Product Picker Section */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between">
-              <span>Agregar Productos al Pedido</span>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {items.length} ítems en orden
-              </span>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div ref={searchContainerRef} className="relative flex-1">
-                {selectedProd ? (
-                  <div className="flex items-center justify-between h-9 px-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs">
-                    <span className="font-bold text-white truncate">
-                      {selectedProd.nombre} ({selectedProd.sku})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProd(null)}
-                      className="p-1 text-slate-400 hover:text-white"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setIsDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsDropdownOpen(true)}
-                      placeholder="Buscar producto por nombre, SKU o código de barras..."
-                      className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    />
-                    {isSearching ? (
-                      <Loader2 className="size-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-amber-400 animate-spin" />
-                    ) : (
-                      <Barcode className="size-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    )}
-                  </div>
-                )}
-
-                {/* Dropdown search results */}
-                {isDropdownOpen && !selectedProd && (
-                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 shadow-2xl z-50 divide-y divide-slate-800">
-                    {searchResults.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-500 font-sans">
-                        {isSearching ? "Buscando en catálogo..." : "No se encontraron productos"}
-                      </div>
-                    ) : (
-                      searchResults.map((prod) => (
-                        <button
-                          key={prod.id}
-                          type="button"
-                          onClick={() => handleSelectProduct(prod)}
-                          className="w-full px-3 py-2 text-left hover:bg-amber-600/20 flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-bold text-white truncate">{prod.nombre}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              SKU: {prod.sku} • Stock: {prod.stock} {prod.tipoVenta === "peso" ? "kg" : "und"}
-                            </div>
-                          </div>
-                          <div className="font-mono text-amber-400 text-xs shrink-0">
-                            Costo: {formatCurrency(prod.precioCosto)}
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="w-24">
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={inputQty}
-                  onChange={(e) => setInputQty(e.target.value)}
-                  placeholder="Cant."
-                  className="w-full h-9 text-center rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-              </div>
-
-              <div className="w-28">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={inputCost}
-                  onChange={(e) => setInputCost(e.target.value)}
-                  placeholder="Costo U."
-                  className="w-full h-9 text-center rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-amber-600/20"
-              >
-                <Plus className="size-3.5" /> Agregar
-              </button>
-            </div>
-
-            {/* Added Items Table */}
-            {items.length > 0 && (
-              <div className="rounded-xl border border-slate-800 overflow-hidden mt-2">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400">
-                    <tr>
-                      <th className="py-2.5 px-3">Producto</th>
-                      <th className="py-2.5 px-3 text-center">Cant. Pedida</th>
-                      <th className="py-2.5 px-3 text-right">Costo Unitario</th>
-                      <th className="py-2.5 px-3 text-right">Total</th>
-                      <th className="py-2.5 px-2 text-center">Quitar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                    {items.map((item) => (
-                      <tr key={item.productoId} className="hover:bg-slate-900/30">
-                        <td className="py-2.5 px-3 text-white font-sans font-medium">
-                          {item.nombre} <span className="text-slate-500 text-[10px]">({item.sku})</span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center text-amber-400 font-bold">
-                          {item.cantidadPedida}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-slate-300">
-                          {formatCurrency(item.costoUnitario)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-white font-bold">
-                          {formatCurrency(item.total)}
-                        </td>
-                        <td className="py-2.5 px-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(item.productoId)}
-                            className="p-1 hover:bg-rose-600/20 text-rose-400 rounded-md transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Totals Summary Card */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs font-mono">
-            <div className="flex items-center gap-4 text-slate-400">
-              <span>Subtotal: <strong className="text-slate-200">{currency === "USD" ? "$ " : "S/ "}{subtotal.toFixed(2)}</strong></span>
-              <span>IGV (18%): <strong className="text-slate-200">{currency === "USD" ? "$ " : "S/ "}{igv.toFixed(2)}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 uppercase text-[10px] font-bold">Total a Facturar:</span>
-              <span className="text-lg font-extrabold text-amber-400">
-                {currency === "USD" ? "$ " : "S/ "}{total.toFixed(2)}
-              </span>
-            </div>
-          </div>
-
-          {/* Observations */}
-          <div>
-            <label className="block text-[11px] font-semibold uppercase text-slate-400 mb-1">
-              Observaciones e Instrucciones de Entrega
-            </label>
-            <textarea
-              rows={2}
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              placeholder="Detalles sobre horario de recepción, rampa, guías requeridas..."
-              className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-slate-600 resize-none"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || items.length === 0}
-              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-600/30 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-            >
-              <CheckCircle2 className="size-4" />
-              {isSubmitting ? "Emitiendo en BD..." : "Generar Orden de Compra"}
-            </button>
-          </div>
+          <OrdeneFooter
+            subtotal={subtotal}
+            igv={igv}
+            total={total}
+            currencySymbol={currencySymbol}
+            observaciones={observaciones}
+            onObservacionesChange={setObservaciones}
+            isSubmitting={isSubmitting}
+            itemsCount={items.length}
+            onClose={onClose}
+          />
         </form>
       </div>
     </div>
