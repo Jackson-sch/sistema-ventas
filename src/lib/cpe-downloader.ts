@@ -2,7 +2,7 @@
 
 import { buildUblXml, SunatDocumentData, SunatItem } from "./sunat";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 import { toast } from "sonner";
 
 export interface DownloadableCpeData {

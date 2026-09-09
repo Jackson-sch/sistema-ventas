@@ -38,6 +38,7 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.4.2",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^1.31.0",
