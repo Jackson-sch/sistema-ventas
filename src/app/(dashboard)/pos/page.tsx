@@ -445,6 +445,9 @@ export default function PosPage() {
         return;
       }
 
+      const finalMontoRecibido = selectedPayment === "efectivo" ? (cashNum > 0 ? cashNum : total) : undefined;
+      const finalVuelto = selectedPayment === "efectivo" ? (cashNum > total ? change : 0) : undefined;
+
       const res = await completeSaleTransactionAction({
         docType,
         clienteId: selectedClientId ?? undefined,
@@ -452,8 +455,8 @@ export default function PosPage() {
         clienteNombre: customerName,
         medioPago: selectedPayment,
         pagos: selectedPayment === "mixto" && splitPaymentsList ? splitPaymentsList : undefined,
-        montoRecibido: cashNum,
-        vuelto: change,
+        montoRecibido: finalMontoRecibido,
+        vuelto: finalVuelto,
         items: cart.map((item) => ({ id: item.id, sku: item.sku, nombre: item.nombre, precio: item.precio, cantidad: item.cantidad, tipo: item.tipo })),
       });
 
@@ -475,7 +478,8 @@ export default function PosPage() {
           items: res.ticketData.items.map((it) => ({ descripcion: it.descripcion, cantidad: it.cantidad, unidad: it.unidad || "NIU", precioUnitario: it.precioUnit, total: it.total })),
           totales: { opGravada: subtotal, opExonerada: 0, opInafecta: 0, igv, descuentoTotal: promoSavings + pointsDiscount, total },
           pagos: [{ medio: selectedPayment, monto: total }],
-          vuelto: change,
+          montoRecibido: finalMontoRecibido,
+          vuelto: finalVuelto,
           hashSunat: res.ticketData.hashSunat,
         }, hasCash);
 

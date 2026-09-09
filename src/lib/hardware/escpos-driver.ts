@@ -51,6 +51,7 @@ export interface TicketPrintPayload {
     medio: string;
     monto: number;
   }[];
+  montoRecibido?: number;
   vuelto?: number;
   hashSunat?: string;
   qrUrl?: string;
@@ -254,8 +255,11 @@ export class EscPosDriver {
     payload.pagos.forEach((p) => {
       write(`PAGO ${p.medio.toUpperCase()}: S/ ${p.monto.toFixed(2)}\n`);
     });
+    if (payload.montoRecibido && payload.montoRecibido > 0) {
+      write(`IMPORTE RECIBIDO: S/ ${payload.montoRecibido.toFixed(2)}\n`);
+    }
     if (payload.vuelto && payload.vuelto > 0) {
-      write(`VUELTO: S/ ${payload.vuelto.toFixed(2)}\n`);
+      write(`VUELTO ENTREGADO: S/ ${payload.vuelto.toFixed(2)}\n`);
     }
 
     // Centrado para Pie de Página y Hash SUNAT

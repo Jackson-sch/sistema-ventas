@@ -235,7 +235,8 @@ export function ThermalTicketDialog({
                 <span className="font-bold text-black uppercase">{ticket.medioPago}</span>
               </div>
 
-              {ticket.pagos && ticket.pagos.length > 0 ? (
+              {/* Si es pago mixto o hay múltiples métodos */}
+              {ticket.pagos && ticket.pagos.length > 1 ? (
                 <div className="space-y-0.5 pt-1 border-t border-slate-200">
                   {ticket.pagos.map((p, idx) => (
                     <div key={idx} className="flex justify-between text-[9px]">
@@ -246,8 +247,11 @@ export function ThermalTicketDialog({
                     </div>
                   ))}
                 </div>
-              ) : ticket.medioPago === "efectivo" ? (
-                <>
+              ) : null}
+
+              {/* Desglose de Efectivo / Importe Recibido y Vuelto */}
+              {(ticket.medioPago === "efectivo" || (ticket.montoRecibido !== undefined && ticket.montoRecibido > 0)) && (
+                <div className="pt-1 border-t border-slate-200 space-y-0.5">
                   <div className="flex justify-between">
                     <span>IMPORTE RECIBIDO:</span>
                     <span className="font-mono font-bold text-black">
@@ -256,10 +260,12 @@ export function ThermalTicketDialog({
                   </div>
                   <div className="flex justify-between font-bold text-black">
                     <span>VUELTO ENTREGADO:</span>
-                    <span className="font-mono">{formatCurrency(ticket.vuelto || 0)}</span>
+                    <span className="font-mono">
+                      {formatCurrency(ticket.vuelto ?? Math.max(0, (ticket.montoRecibido || ticket.total) - ticket.total))}
+                    </span>
                   </div>
-                </>
-              ) : null}
+                </div>
+              )}
             </div>
 
             {/* Legal Fiscal Footer & QR Code */}
