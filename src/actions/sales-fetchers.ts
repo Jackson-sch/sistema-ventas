@@ -14,8 +14,12 @@ function fmtHora(d: Date): string {
   return d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
 }
 
+import { getSalesFromMemoryStore } from "@/lib/sales-store";
+
 // 8. HISTORIAL DE VENTAS & COMPROBANTES
 export async function getSalesHistoryData() {
+  const memorySales = getSalesFromMemoryStore();
+
   try {
     if (hasDb()) {
       const [ventasRows, comprobantesRows, pagosRows, detalleRows, cajasRows] = await Promise.all([
@@ -64,7 +68,7 @@ export async function getSalesHistoryData() {
         }
         const cajaMap = new Map(cajasRows.map((c) => [c.id, c.nombre]));
 
-        return ventasRows.map((v, idx) => {
+        const dbSales = ventasRows.map((v, idx) => {
           const comprobante = comprobanteMap.get(v.id);
           const pago = pagoMap.get(v.id);
           const detalle = detallePorVenta.get(v.id) ?? [];
@@ -95,75 +99,16 @@ export async function getSalesHistoryData() {
             })),
           };
         });
+
+        // Combinar evitando duplicados
+        const idsInDb = new Set(dbSales.map((s) => s.id));
+        const extraMemory = memorySales.filter((s) => !idsInDb.has(s.id) && !idsInDb.has(s.comprobante));
+        return [...extraMemory, ...dbSales];
       }
     }
   } catch (err) {
-    console.warn("getSalesHistoryData: DB fallback:", err);
+    console.warn("getSalesHistoryData: DB fallback, using memory store:", err);
   }
 
-  return [
-    {
-      id: "1",
-      comprobante: "B001-00042918",
-      tipo: "Boleta" as const,
-      cliente: "Clientes Varios",
-      docNumero: "00000000",
-      medioPago: "efectivo" as const,
-      caja: "Caja 01 - Principal",
-      cajero: "Carlos Alarcón",
-      total: 28.50,
-      fecha: "15/08/2026",
-      hora: "11:42",
-      estadoSunat: "aceptado" as const,
-      hashSunat: "7x8A9B2C3D4E5F6G",
-      items: [
-        { cantidad: 2, descripcion: "Leche Gloria Entera 400g", precioUnit: 4.50, total: 9.00, unidad: "und" },
-        { cantidad: 1, descripcion: "Aceite Primor Premium 1L", precioUnit: 9.80, total: 9.80, unidad: "und" },
-        { cantidad: 1.5, descripcion: "Manzana Delicia Nacional (kg)", precioUnit: 4.80, total: 7.20, unidad: "kg" },
-        { cantidad: 1, descripcion: "Bolsa Ecológica Biodegradable", precioUnit: 2.50, total: 2.50, unidad: "und" },
-      ],
-    },
-    {
-      id: "2",
-      comprobante: "F001-00008912",
-      tipo: "Factura" as const,
-      cliente: "Inversiones Retail SAC",
-      docNumero: "20601234567",
-      medioPago: "tarjeta" as const,
-      caja: "Caja 01 - Principal",
-      cajero: "Carlos Alarcón",
-      total: 145.80,
-      fecha: "15/08/2026",
-      hora: "11:15",
-      estadoSunat: "aceptado" as const,
-      hashSunat: "1a2B3c4D5e6F7g8H",
-      items: [
-        { cantidad: 10, descripcion: "Arroz Costeño Extra 1kg", precioUnit: 5.20, total: 52.00, unidad: "und" },
-        { cantidad: 5, descripcion: "Aceite Primor Premium 1L", precioUnit: 9.80, total: 49.00, unidad: "und" },
-        { cantidad: 4, descripcion: "Detergente Bolívar 1kg", precioUnit: 8.50, total: 34.00, unidad: "und" },
-        { cantidad: 12, descripcion: "Galletas Soda San Jorge 6pk", precioUnit: 0.90, total: 10.80, unidad: "und" },
-      ],
-    },
-    {
-      id: "3",
-      comprobante: "B001-00042917",
-      tipo: "Boleta" as const,
-      cliente: "Juan Pérez García",
-      docNumero: "45892144",
-      medioPago: "yape" as const,
-      caja: "Caja 02 - Rápida",
-      cajero: "María Gómez",
-      total: 45.80,
-      fecha: "15/08/2026",
-      hora: "10:55",
-      estadoSunat: "aceptado" as const,
-      hashSunat: "9z8Y7x6W5v4U3t2S",
-      items: [
-        { cantidad: 4, descripcion: "Leche Gloria Entera 400g", precioUnit: 4.50, total: 18.00, unidad: "und" },
-        { cantidad: 2, descripcion: "Yogurt Gloria Fresa 1L", precioUnit: 7.20, total: 14.40, unidad: "und" },
-        { cantidad: 2.8, descripcion: "Plátano de Seda (kg)", precioUnit: 4.50, total: 12.60, unidad: "kg" },
-        { cantidad: 1, descripcion: "Bolsa Plástica", precioUnit: 0.80, total: 0.80, unidad: "und" },
-      ],
-    },
-  ];
+  return memorySales;
 }

@@ -7,6 +7,7 @@ import { getDevContext, ensureSesionAbierta } from "./context";
 import { getNextCorrelativoNumber } from "./series-actions";
 import { buildUblXml, SunatDocumentData } from "@/lib/sunat";
 import { TicketData } from "@/components/ventas/thermal-ticket-dialog";
+import { addSaleToMemoryStore } from "@/lib/sales-store";
 
 export interface SaleItemInput {
   id: string;
@@ -351,6 +352,30 @@ export async function completeSaleTransactionAction(
       total: totalVenta,
       hashSunat: sunatResult.hash,
     };
+
+    // Always register in shared memory store for immediate dashboard/sales sync
+    addSaleToMemoryStore({
+      id: ventaId,
+      comprobante: serieNumero,
+      tipo: isFactura ? "Factura" : "Boleta",
+      cliente: input.clienteNombre || (input.clienteDoc === "00000000" ? "Clientes Varios" : "Cliente Particular"),
+      docNumero: input.clienteDoc || "00000000",
+      medioPago: ((input.medioPago === "transferencia" ? "plin" : input.medioPago as any) || "efectivo") as "efectivo" | "tarjeta" | "yape" | "plin",
+      caja: ctx.cajaNombre || "Caja 01 - Principal",
+      cajero: ctx.cajeroNombre || "Carlos Alarcón",
+      total: totalVenta,
+      fecha: fechaActual.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      hora: fechaActual.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
+      estadoSunat: "aceptado",
+      hashSunat: sunatResult.hash,
+      items: input.items.map((item) => ({
+        cantidad: item.cantidad,
+        descripcion: item.nombre,
+        precioUnit: item.precio,
+        total: +(item.precio * item.cantidad).toFixed(2),
+        unidad: item.tipo === "peso" ? "kg" : "und",
+      })),
+    });
 
     return {
       success: true,

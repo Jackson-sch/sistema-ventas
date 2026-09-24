@@ -21,6 +21,9 @@ import {
   Clock,
   ShieldCheck,
   Eye,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -64,6 +67,8 @@ export default function VentasPage() {
   const [filterDoc, setFilterDoc] = useQueryState("tipo", parseAsString.withDefault("all"));
   const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
+  const [sortField, setSortField] = useQueryState("sortBy", parseAsString.withDefault("fecha"));
+  const [sortDirection, setSortDirection] = useQueryState("order", parseAsString.withDefault("desc"));
 
   // Thermal Ticket modal state
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
@@ -80,7 +85,7 @@ export default function VentasPage() {
       if (data) {
         setSales(data);
         if (showToast) {
-          toast.success(`Historial actualizado: ${data.length} ventas sincronizadas desde PostgreSQL.`);
+          toast.success(`Historial actualizado: ${data.length} ventas sincronizadas.`);
         }
       }
     } catch (err) {
@@ -109,6 +114,16 @@ export default function VentasPage() {
   const totalComprobantes = sales.filter((s) => s.tipo !== "Nota de Crédito").length;
   const totalNC = sales.filter((s) => s.tipo === "Nota de Crédito").length;
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+    setCurrentPage(1);
+  };
+
   const filtered = sales.filter((s) => {
     const matchesSearch =
       s.comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,7 +138,62 @@ export default function VentasPage() {
     return matchesSearch && matchesDoc;
   });
 
-  const paginatedSales = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const sortedSales = [...filtered].sort((a, b) => {
+    let aVal: any;
+    let bVal: any;
+
+    switch (sortField) {
+      case "comprobante":
+        aVal = a.comprobante;
+        bVal = b.comprobante;
+        break;
+      case "cliente":
+        aVal = a.cliente;
+        bVal = b.cliente;
+        break;
+      case "medioPago":
+        aVal = a.medioPago;
+        bVal = b.medioPago;
+        break;
+      case "caja":
+        aVal = a.caja;
+        bVal = b.caja;
+        break;
+      case "estadoSunat":
+        aVal = a.estadoSunat;
+        bVal = b.estadoSunat;
+        break;
+      case "total":
+        aVal = a.total;
+        bVal = b.total;
+        break;
+      case "fecha":
+      default: {
+        const parseDate = (d: string, h: string) => {
+          if (!d) return 0;
+          if (d.includes("/")) {
+            const [day, month, year] = d.split("/");
+            return new Date(`${year}-${month}-${day}T${h || "00:00"}`).getTime();
+          }
+          return new Date(`${d}T${h || "00:00"}`).getTime();
+        };
+        aVal = parseDate(a.fecha, a.hora);
+        bVal = parseDate(b.fecha, b.hora);
+        break;
+      }
+    }
+
+    if (typeof aVal === "string") {
+      const cmp = aVal.localeCompare(bVal, "es", { sensitivity: "base" });
+      return sortDirection === "asc" ? cmp : -cmp;
+    }
+
+    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedSales = sortedSales.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleOpenTicket = (sale: SaleRecord) => {
     const ticketData: TicketData = {
@@ -140,8 +210,8 @@ export default function VentasPage() {
       },
       items: sale.items,
       medioPago: sale.medioPago,
-      montoRecibido: sale.medioPago === "efectivo" ? sale.total + 10 : undefined,
-      vuelto: sale.medioPago === "efectivo" ? 10 : undefined,
+      montoRecibido: sale.medioPago === "efectivo" ? sale.total : undefined,
+      vuelto: sale.medioPago === "efectivo" ? 0 : undefined,
       total: sale.total,
       hashSunat: sale.hashSunat,
     };
@@ -358,13 +428,97 @@ export default function VentasPage() {
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold">
-              <th className="py-3.5 px-4">Comprobante SUNAT</th>
-              <th className="py-3.5 px-4">Cliente / Razón Social</th>
-              <th className="py-3.5 px-4 text-center">Medio de Pago</th>
-              <th className="py-3.5 px-4 text-center">Caja & Cajero</th>
-              <th className="py-3.5 px-4 text-center">Fecha / Hora</th>
-              <th className="py-3.5 px-4 text-center">Estado SUNAT</th>
-              <th className="py-3.5 px-4 text-right">Total</th>
+              <th
+                onClick={() => handleSort("comprobante")}
+                className="py-3.5 px-4 cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={sortField === "comprobante" ? "text-blue-400 font-bold" : ""}>Comprobante SUNAT</span>
+                  {sortField === "comprobante" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("cliente")}
+                className="py-3.5 px-4 cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={sortField === "cliente" ? "text-blue-400 font-bold" : ""}>Cliente / Razón Social</span>
+                  {sortField === "cliente" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("medioPago")}
+                className="py-3.5 px-4 text-center cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className={sortField === "medioPago" ? "text-blue-400 font-bold" : ""}>Medio de Pago</span>
+                  {sortField === "medioPago" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("caja")}
+                className="py-3.5 px-4 text-center cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className={sortField === "caja" ? "text-blue-400 font-bold" : ""}>Caja & Cajero</span>
+                  {sortField === "caja" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("fecha")}
+                className="py-3.5 px-4 text-center cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className={sortField === "fecha" ? "text-blue-400 font-bold" : ""}>Fecha / Hora</span>
+                  {sortField === "fecha" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("estadoSunat")}
+                className="py-3.5 px-4 text-center cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className={sortField === "estadoSunat" ? "text-blue-400 font-bold" : ""}>Estado SUNAT</span>
+                  {sortField === "estadoSunat" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("total")}
+                className="py-3.5 px-4 text-right cursor-pointer select-none hover:text-white transition-colors group"
+              >
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className={sortField === "total" ? "text-blue-400 font-bold" : ""}>Total</span>
+                  {sortField === "total" ? (
+                    sortDirection === "asc" ? <ArrowUp className="size-3 text-blue-400 shrink-0" /> : <ArrowDown className="size-3 text-blue-400 shrink-0" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 group-hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              </th>
               <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>
