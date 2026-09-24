@@ -182,10 +182,10 @@ export async function lookupIdentityAction(
     console.warn("Error en consulta local de cliente:", err);
   }
 
-  // 3. Nivel 2: Consulta vía Microservicio sunat-billing-api (Bun)
+  // 3. Nivel 2: Consulta vía Microservicio sunat-billing-api (Bun / Vercel)
   try {
-    const sunatApiUrl = process.env.SUNAT_API_URL || "http://localhost:3001";
-    const apiKey = process.env.SUNAT_API_KEY || "novamarket_secret_api_key_2026";
+    const sunatApiUrl = (process.env.SUNAT_API_URL || "https://sunat-billing-api.vercel.app").replace(/\/+$/, "");
+    const apiKey = process.env.SUNAT_API_KEY || "sk_live_oxzxb2e03gf302nr";
     const endpoint = tipoDoc === "RUC" ? `${sunatApiUrl}/api/v1/consultas/ruc` : `${sunatApiUrl}/api/v1/consultas/dni`;
 
     const res = await fetch(endpoint, {

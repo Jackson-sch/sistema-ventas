@@ -2,8 +2,8 @@
  * Cliente HTTP para consumir el microservicio independiente sunat-billing-api (Bun + Hono)
  */
 
-const SUNAT_API_URL = process.env.SUNAT_API_URL || "http://localhost:3001";
-const SUNAT_API_KEY = process.env.SUNAT_API_KEY || "novamarket_secret_api_key_2026";
+const SUNAT_API_URL = (process.env.SUNAT_API_URL || "https://sunat-billing-api.vercel.app").replace(/\/+$/, "");
+const SUNAT_API_KEY = process.env.SUNAT_API_KEY || "sk_live_oxzxb2e03gf302nr";
 
 export interface ApiCpeInput {
   tipoComprobante: "01" | "03" | "07" | "08";
