@@ -20,6 +20,9 @@ import {
   Download,
   Filter,
   RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -40,6 +43,8 @@ export default function ClientesPage() {
   const [filterCategory, setFilterCategory] = useQueryState("categoria", parseAsString.withDefault("all"));
   const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
+  const [sortBy, setSortBy] = useQueryState("sortBy", parseAsString.withDefault("nombre"));
+  const [sortOrder, setSortOrder] = useQueryState("order", parseAsString.withDefault("asc"));
 
   // Form modal
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -83,6 +88,16 @@ export default function ClientesPage() {
     loadData();
   }, []);
 
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+    setCurrentPage(1);
+  };
+
   const filtered = clients.filter((c) => {
     const matchesSearch =
       c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -97,7 +112,50 @@ export default function ClientesPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const paginatedClients = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const sorted = [...filtered].sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+
+    switch (sortBy) {
+      case "nombre":
+        aVal = a.nombre.toLowerCase();
+        bVal = b.nombre.toLowerCase();
+        break;
+      case "numDoc":
+        aVal = a.numDoc;
+        bVal = b.numDoc;
+        break;
+      case "contacto":
+        aVal = (a.email || a.telefono || "").toLowerCase();
+        bVal = (b.email || b.telefono || "").toLowerCase();
+        break;
+      case "categoria":
+        aVal = a.categoria.toLowerCase();
+        bVal = b.categoria.toLowerCase();
+        break;
+      case "puntos":
+        aVal = a.puntos;
+        bVal = b.puntos;
+        break;
+      case "totalCompras":
+        aVal = a.totalCompras;
+        bVal = b.totalCompras;
+        break;
+      case "ultimoConsumo":
+        aVal = a.ultimoConsumo ? new Date(a.ultimoConsumo).getTime() : 0;
+        bVal = b.ultimoConsumo ? new Date(b.ultimoConsumo).getTime() : 0;
+        break;
+      default:
+        aVal = a.nombre;
+        bVal = b.nombre;
+    }
+
+    if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedClients = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const totalPuntosActivos = clients.reduce((acc, c) => acc + c.puntos, 0);
   const totalComprasAcumuladas = clients.reduce((acc, c) => acc + c.totalCompras, 0);
@@ -282,13 +340,91 @@ export default function ClientesPage() {
       <div className="glass-panel rounded-2xl overflow-hidden">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold">
-              <th className="py-3.5 px-4">Documento & Cliente</th>
-              <th className="py-3.5 px-4">Contacto</th>
-              <th className="py-3.5 px-4 text-center">Categoría</th>
-              <th className="py-3.5 px-4 text-center">Puntos Acumulados</th>
-              <th className="py-3.5 px-4 text-right">Total Comprado</th>
-              <th className="py-3.5 px-4 text-center">Última Compra</th>
+            <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold select-none">
+              <th className="py-3.5 px-4">
+                <button
+                  type="button"
+                  onClick={() => handleSort("nombre")}
+                  className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                >
+                  Documento & Cliente
+                  {sortBy === "nombre" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3.5 px-4">
+                <button
+                  type="button"
+                  onClick={() => handleSort("contacto")}
+                  className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                >
+                  Contacto
+                  {sortBy === "contacto" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3.5 px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleSort("categoria")}
+                  className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  Categoría
+                  {sortBy === "categoria" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3.5 px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleSort("puntos")}
+                  className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  Puntos Acumulados
+                  {sortBy === "puntos" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3.5 px-4 text-right">
+                <button
+                  type="button"
+                  onClick={() => handleSort("totalCompras")}
+                  className="flex items-center justify-end gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  Total Comprado
+                  {sortBy === "totalCompras" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3.5 px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleSort("ultimoConsumo")}
+                  className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  Última Compra
+                  {sortBy === "ultimoConsumo" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
               <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>

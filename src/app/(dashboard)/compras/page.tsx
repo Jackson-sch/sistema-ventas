@@ -25,6 +25,9 @@ import {
   AlertCircle,
   Package,
   ArrowDownRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -44,11 +47,16 @@ export default function ComprasPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Pagination states
+  // Pagination & Sorting states
   const [purchasePage, setPurchasePage] = useState(1);
   const [purchasePageSize, setPurchasePageSize] = useState(10);
+  const [purchaseSortBy, setPurchaseSortBy] = useState<string>("fechaRecepcion");
+  const [purchaseSortOrder, setPurchaseSortOrder] = useState<"asc" | "desc">("desc");
+
   const [supplierPage, setSupplierPage] = useState(1);
   const [supplierPageSize, setSupplierPageSize] = useState(10);
+  const [supplierSortBy, setSupplierSortBy] = useState<string>("razonSocial");
+  const [supplierSortOrder, setSupplierSortOrder] = useState<"asc" | "desc">("asc");
 
   // Dialogs
   const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
@@ -87,16 +95,79 @@ export default function ComprasPage() {
   const totalCompradoMes = purchases.reduce((acc, p) => acc + p.total, 0);
   const totalFacturas = purchases.length;
 
+  const handlePurchaseSort = (field: string) => {
+    if (purchaseSortBy === field) {
+      setPurchaseSortOrder(purchaseSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setPurchaseSortBy(field);
+      setPurchaseSortOrder("desc");
+    }
+    setPurchasePage(1);
+  };
+
   const filteredPurchases = purchases.filter((p) =>
     p.numeroFactura.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.proveedorNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.proveedorRuc.includes(searchTerm)
   );
 
-  const paginatedPurchases = filteredPurchases.slice(
+  const sortedPurchases = [...filteredPurchases].sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+
+    switch (purchaseSortBy) {
+      case "numeroFactura":
+        aVal = a.numeroFactura.toLowerCase();
+        bVal = b.numeroFactura.toLowerCase();
+        break;
+      case "proveedorNombre":
+        aVal = a.proveedorNombre.toLowerCase();
+        bVal = b.proveedorNombre.toLowerCase();
+        break;
+      case "fechaRecepcion":
+        aVal = new Date(a.fechaRecepcion).getTime() || 0;
+        bVal = new Date(b.fechaRecepcion).getTime() || 0;
+        break;
+      case "condicionPago":
+        aVal = a.condicionPago.toLowerCase();
+        bVal = b.condicionPago.toLowerCase();
+        break;
+      case "estado":
+        aVal = a.estado.toLowerCase();
+        bVal = b.estado.toLowerCase();
+        break;
+      case "total":
+        aVal = a.total;
+        bVal = b.total;
+        break;
+      case "items":
+        aVal = a.items.length;
+        bVal = b.items.length;
+        break;
+      default:
+        aVal = a.numeroFactura;
+        bVal = b.numeroFactura;
+    }
+
+    if (aVal < bVal) return purchaseSortOrder === "asc" ? -1 : 1;
+    if (aVal > bVal) return purchaseSortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedPurchases = sortedPurchases.slice(
     (purchasePage - 1) * purchasePageSize,
     purchasePage * purchasePageSize
   );
+
+  const handleSupplierSort = (field: string) => {
+    if (supplierSortBy === field) {
+      setSupplierSortOrder(supplierSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSupplierSortBy(field);
+      setSupplierSortOrder("asc");
+    }
+    setSupplierPage(1);
+  };
 
   const filteredSuppliers = suppliers.filter((s) =>
     s.razonSocial.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -104,7 +175,42 @@ export default function ComprasPage() {
     s.contactoNombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const paginatedSuppliers = filteredSuppliers.slice(
+  const sortedSuppliers = [...filteredSuppliers].sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+
+    switch (supplierSortBy) {
+      case "razonSocial":
+        aVal = a.razonSocial.toLowerCase();
+        bVal = b.razonSocial.toLowerCase();
+        break;
+      case "contacto":
+        aVal = a.contactoNombre.toLowerCase();
+        bVal = b.contactoNombre.toLowerCase();
+        break;
+      case "direccion":
+        aVal = (a.direccion || "").toLowerCase();
+        bVal = (b.direccion || "").toLowerCase();
+        break;
+      case "condicionPago":
+        aVal = a.condicionPago.toLowerCase();
+        bVal = b.condicionPago.toLowerCase();
+        break;
+      case "totalComprado":
+        aVal = a.totalComprado || 0;
+        bVal = b.totalComprado || 0;
+        break;
+      default:
+        aVal = a.razonSocial;
+        bVal = b.razonSocial;
+    }
+
+    if (aVal < bVal) return supplierSortOrder === "asc" ? -1 : 1;
+    if (aVal > bVal) return supplierSortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedSuppliers = sortedSuppliers.slice(
     (supplierPage - 1) * supplierPageSize,
     supplierPage * supplierPageSize
   );
@@ -263,14 +369,105 @@ export default function ComprasPage() {
         <div className="glass-panel rounded-2xl overflow-hidden animate-in fade-in duration-150">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-4">Factura / Guía</th>
-                <th className="py-3.5 px-4">Proveedor Mayorista</th>
-                <th className="py-3.5 px-4 text-center">Fecha Recepción</th>
-                <th className="py-3.5 px-4 text-center">Condición de Pago</th>
-                <th className="py-3.5 px-4 text-center">Estado</th>
-                <th className="py-3.5 px-4 text-right">Total Facturado</th>
-                <th className="py-3.5 px-4 text-center">Ítems</th>
+              <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold select-none">
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("numeroFactura")}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Factura / Guía
+                    {purchaseSortBy === "numeroFactura" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("proveedorNombre")}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Proveedor Mayorista
+                    {purchaseSortBy === "proveedorNombre" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("fechaRecepcion")}
+                    className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Fecha Recepción
+                    {purchaseSortBy === "fechaRecepcion" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("condicionPago")}
+                    className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Condición de Pago
+                    {purchaseSortBy === "condicionPago" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("estado")}
+                    className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Estado
+                    {purchaseSortBy === "estado" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("total")}
+                    className="flex items-center justify-end gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Total Facturado
+                    {purchaseSortBy === "total" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSort("items")}
+                    className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Ítems
+                    {purchaseSortBy === "items" ? (
+                      purchaseSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-medium">
@@ -326,12 +523,77 @@ export default function ComprasPage() {
         <div className="glass-panel rounded-2xl overflow-hidden animate-in fade-in duration-150">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-4">RUC & Razón Social</th>
-                <th className="py-3.5 px-4">Contacto Comercial</th>
-                <th className="py-3.5 px-4">Dirección Fiscal</th>
-                <th className="py-3.5 px-4 text-center">Condición de Pago</th>
-                <th className="py-3.5 px-4 text-right">Compras Acumuladas</th>
+              <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold select-none">
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSupplierSort("razonSocial")}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                  >
+                    RUC & Razón Social
+                    {supplierSortBy === "razonSocial" ? (
+                      supplierSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSupplierSort("contacto")}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Contacto Comercial
+                    {supplierSortBy === "contacto" ? (
+                      supplierSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSupplierSort("direccion")}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Dirección Fiscal
+                    {supplierSortBy === "direccion" ? (
+                      supplierSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleSupplierSort("condicionPago")}
+                    className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Condición de Pago
+                    {supplierSortBy === "condicionPago" ? (
+                      supplierSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleSupplierSort("totalComprado")}
+                    className="flex items-center justify-end gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                  >
+                    Compras Acumuladas
+                    {supplierSortBy === "totalComprado" ? (
+                      supplierSortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                    ) : (
+                      <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                    )}
+                  </button>
+                </th>
                 <th className="py-3.5 px-4 text-center">Acciones</th>
               </tr>
             </thead>

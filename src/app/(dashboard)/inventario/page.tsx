@@ -8,6 +8,8 @@ import {
   Plus,
   AlertTriangle,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Filter,
   Layers,
   Calendar,
@@ -55,6 +57,8 @@ export default function InventarioPage() {
   const [selectedCategory, setSelectedCategory] = useQueryState("categoria", parseAsString.withDefault("Todas"));
   const [currentPage, setCurrentPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [pageSize, setPageSize] = useQueryState("size", parseAsInteger.withDefault(10));
+  const [sortBy, setSortBy] = useQueryState("sortBy", parseAsString.withDefault("nombre"));
+  const [sortOrder, setSortOrder] = useQueryState("order", parseAsString.withDefault("asc"));
 
   // Dialogs state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -101,6 +105,16 @@ export default function InventarioPage() {
 
   const categories = ["Todas", "Lácteos", "Abarrotes", "Frutas & Verduras", "Limpieza"];
 
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+    setCurrentPage(1);
+  };
+
   const filtered = products.filter((p) => {
     const matchesSearch =
       p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,7 +124,50 @@ export default function InventarioPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const paginatedProducts = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const sorted = [...filtered].sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+
+    switch (sortBy) {
+      case "nombre":
+        aVal = a.nombre.toLowerCase();
+        bVal = b.nombre.toLowerCase();
+        break;
+      case "sku":
+        aVal = a.sku.toLowerCase();
+        bVal = b.sku.toLowerCase();
+        break;
+      case "categoria":
+        aVal = a.categoria.toLowerCase();
+        bVal = b.categoria.toLowerCase();
+        break;
+      case "stockActual":
+        aVal = a.stockActual;
+        bVal = b.stockActual;
+        break;
+      case "precioCosto":
+        aVal = a.precioCosto;
+        bVal = b.precioCosto;
+        break;
+      case "precioVenta":
+        aVal = a.precioVenta;
+        bVal = b.precioVenta;
+        break;
+      case "vencimiento":
+        aVal = a.vencimiento ? new Date(a.vencimiento).getTime() : 0;
+        bVal = b.vencimiento ? new Date(b.vencimiento).getTime() : 0;
+        break;
+      default:
+        aVal = a.nombre;
+        bVal = b.nombre;
+    }
+
+    if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedProducts = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const totalValorizado = products.reduce((acc, p) => acc + p.stockActual * p.precioCosto, 0);
   const itemsCriticos = products.filter((p) => p.stockActual <= p.stockMinimo).length;
@@ -316,13 +373,91 @@ export default function InventarioPage() {
       <div className="glass-panel rounded-2xl overflow-hidden">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold">
-              <th className="py-3 px-4">Producto & SKU</th>
-              <th className="py-3 px-4">Categoría</th>
-              <th className="py-3 px-4 text-center">Stock Actual</th>
-              <th className="py-3 px-4 text-right">P. Costo</th>
-              <th className="py-3 px-4 text-right">P. Venta</th>
-              <th className="py-3 px-4 text-center">Lote / Caducidad</th>
+            <tr className="border-b border-slate-800/90 bg-slate-950/90 text-slate-400 uppercase tracking-wider font-semibold select-none">
+              <th className="py-3 px-4">
+                <button
+                  type="button"
+                  onClick={() => handleSort("nombre")}
+                  className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                >
+                  Producto & SKU
+                  {sortBy === "nombre" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3 px-4">
+                <button
+                  type="button"
+                  onClick={() => handleSort("categoria")}
+                  className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                >
+                  Categoría
+                  {sortBy === "categoria" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3 px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleSort("stockActual")}
+                  className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  Stock Actual
+                  {sortBy === "stockActual" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3 px-4 text-right">
+                <button
+                  type="button"
+                  onClick={() => handleSort("precioCosto")}
+                  className="flex items-center justify-end gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  P. Costo
+                  {sortBy === "precioCosto" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3 px-4 text-right">
+                <button
+                  type="button"
+                  onClick={() => handleSort("precioVenta")}
+                  className="flex items-center justify-end gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  P. Venta
+                  {sortBy === "precioVenta" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
+              <th className="py-3 px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleSort("vencimiento")}
+                  className="flex items-center justify-center gap-1.5 w-full hover:text-white transition-colors cursor-pointer"
+                >
+                  Lote / Caducidad
+                  {sortBy === "vencimiento" ? (
+                    sortOrder === "asc" ? <ArrowUp className="size-3.5 text-blue-400" /> : <ArrowDown className="size-3.5 text-blue-400" />
+                  ) : (
+                    <ArrowUpDown className="size-3 text-slate-600 opacity-60" />
+                  )}
+                </button>
+              </th>
               <th className="py-3 px-4 text-center">Acciones</th>
             </tr>
           </thead>
