@@ -138,58 +138,101 @@ export default function VentasPage() {
     return matchesSearch && matchesDoc;
   });
 
+  const parseSaleDateTime = (d?: string, h?: string): number => {
+    if (!d) return 0;
+
+    // Direct ISO format check
+    if (d.includes("T") || (d.includes("-") && d.length > 10)) {
+      const ts = new Date(d).getTime();
+      if (!isNaN(ts)) return ts;
+    }
+
+    let year = 1970;
+    let month = 1;
+    let day = 1;
+
+    if (d.includes("/")) {
+      const parts = d.split("/").map((p) => parseInt(p.trim(), 10));
+      day = parts[0] || 1;
+      month = parts[1] || 1;
+      year = parts[2] || 1970;
+    } else if (d.includes("-")) {
+      const parts = d.split("-").map((p) => parseInt(p.trim(), 10));
+      year = parts[0] || 1970;
+      month = parts[1] || 1;
+      day = parts[2] || 1;
+    }
+
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
+
+    if (h) {
+      const isPM = /p\.?\s*m\.?/i.test(h) || /pm/i.test(h);
+      const isAM = /a\.?\s*m\.?/i.test(h) || /am/i.test(h);
+      const cleanTime = h.replace(/[^0-9:]/g, " ").trim();
+      const timeParts = cleanTime.split(":").map((p) => parseInt(p.trim(), 10)).filter((n) => !isNaN(n));
+      if (timeParts.length >= 1) {
+        hours = timeParts[0] || 0;
+        minutes = timeParts[1] || 0;
+        seconds = timeParts[2] || 0;
+        if (isPM && hours < 12) hours += 12;
+        if (isAM && hours === 12) hours = 0;
+      }
+    }
+
+    const dateObj = new Date(year, month - 1, day, hours, minutes, seconds);
+    const ts = dateObj.getTime();
+    return isNaN(ts) ? 0 : ts;
+  };
+
   const sortedSales = [...filtered].sort((a, b) => {
     let aVal: any;
     let bVal: any;
 
     switch (sortField) {
       case "comprobante":
-        aVal = a.comprobante;
-        bVal = b.comprobante;
+        aVal = a.comprobante || "";
+        bVal = b.comprobante || "";
         break;
       case "cliente":
-        aVal = a.cliente;
-        bVal = b.cliente;
+        aVal = a.cliente || "";
+        bVal = b.cliente || "";
         break;
       case "medioPago":
-        aVal = a.medioPago;
-        bVal = b.medioPago;
+        aVal = a.medioPago || "";
+        bVal = b.medioPago || "";
         break;
       case "caja":
-        aVal = a.caja;
-        bVal = b.caja;
+        aVal = a.caja || "";
+        bVal = b.caja || "";
         break;
       case "estadoSunat":
-        aVal = a.estadoSunat;
-        bVal = b.estadoSunat;
+        aVal = a.estadoSunat || "";
+        bVal = b.estadoSunat || "";
         break;
       case "total":
-        aVal = a.total;
-        bVal = b.total;
+        aVal = a.total || 0;
+        bVal = b.total || 0;
         break;
       case "fecha":
       default: {
-        const parseDate = (d: string, h: string) => {
-          if (!d) return 0;
-          if (d.includes("/")) {
-            const [day, month, year] = d.split("/");
-            return new Date(`${year}-${month}-${day}T${h || "00:00"}`).getTime();
-          }
-          return new Date(`${d}T${h || "00:00"}`).getTime();
-        };
-        aVal = parseDate(a.fecha, a.hora);
-        bVal = parseDate(b.fecha, b.hora);
+        aVal = parseSaleDateTime(a.fecha, a.hora);
+        bVal = parseSaleDateTime(b.fecha, b.hora);
         break;
       }
     }
 
-    if (typeof aVal === "string") {
-      const cmp = aVal.localeCompare(bVal, "es", { sensitivity: "base" });
+    if (typeof aVal === "string" && typeof bVal === "string") {
+      const cmp = aVal.localeCompare(bVal, "es", { numeric: true, sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     }
 
-    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    const numA = typeof aVal === "number" ? aVal : 0;
+    const numB = typeof bVal === "number" ? bVal : 0;
+
+    if (numA < numB) return sortDirection === "asc" ? -1 : 1;
+    if (numA > numB) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
 
